@@ -8,3 +8,56 @@ commands:
   balance:
     description: Shows your COINS balance (live, read from the backend).
     usage: /balance
+  punish:
+    description: Issue a punishment from a template (or list applicable templates).
+    usage: /punish <player> [template] [grund]
+    permission: mcplatform.punish
+  unpunish:
+    description: Revoke a punishment by id.
+    usage: /unpunish <id> [grund]
+    permission: mcplatform.punish.revoke
+  history:
+    description: Show a player's active punishments.
+    usage: /history <player>
+    permission: mcplatform.punish.history
+  warn:
+    description: Warn a player.
+    usage: /warn <player> [grund]
+    permission: mcplatform.punish.warn
+  tempban:
+    description: Temporarily ban a player.
+    usage: /tempban <player> <duration> [grund]
+    permission: mcplatform.punish.tempban
+  chatban:
+    description: Mute a player in chat for a duration.
+    usage: /chatban <player> <duration> [grund]
+    permission: mcplatform.punish.chatban
+  permaban:
+    description: Permanently ban a player.
+    usage: /permaban <player> [grund]
+    permission: mcplatform.punish.permaban
+
+# Optimistic UI-gate only. The backend is the real authority on who may apply which
+# template/action and rejects with 403; these defaults just keep the in-game UX sane.
+permissions:
+  mcplatform.punish:
+    description: Use /punish and view applicable templates.
+    default: op
+  mcplatform.punish.revoke:
+    description: Use /unpunish.
+    default: op
+  mcplatform.punish.history:
+    description: Use /history.
+    default: op
+  mcplatform.punish.warn:
+    description: Use /warn.
+    default: op
+  mcplatform.punish.tempban:
+    description: Use /tempban.
+    default: op
+  mcplatform.punish.chatban:
+    description: Use /chatban.
+    default: op
+  mcplatform.punish.permaban:
+    description: Use /permaban.
+    default: op
