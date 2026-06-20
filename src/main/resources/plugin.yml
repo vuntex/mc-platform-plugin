@@ -1,0 +1,10 @@
+name: McPlatformPlugin
+version: '${version}'
+main: com.mcplatform.plugin.platform.McPlatformPlugin
+api-version: '1.21'
+author: mc-platform
+description: REST/Redis client plugin for the mc-platform backend. Generic feature skeleton.
+commands:
+  balance:
+    description: Shows your COINS balance (live, read from the backend).
+    usage: /balance

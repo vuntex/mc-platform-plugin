@@ -1,0 +1,18 @@
+backend:
+  # Base URL of the Spring Boot economy backend. No trailing slash.
+  base-url: http://localhost:8080
+  # Connection + per-request timeouts (milliseconds).
+  connect-timeout-ms: 5000
+  request-timeout-ms: 5000
+  # Extra attempts after the first, for idempotent calls only (total = max-retries + 1).
+  max-retries: 2
+  # Base backoff between retries (milliseconds); grows linearly per attempt.
+  retry-backoff-ms: 200
+
+redis:
+  # Read-only Pub/Sub subscriber for live updates (e.g. mc:economy:balance).
+  # The plugin only subscribes here; it never writes to Redis or reads backend-internal keys.
+  host: localhost
+  port: 6379
+  # Leave empty for no AUTH.
+  password: ""
