@@ -20,6 +20,10 @@ commands:
     description: Show a player's active punishments.
     usage: /history <player>
     permission: mcplatform.punish.history
+  punishments:
+    description: Open the paginated punishment history menu for a player.
+    usage: /punishments <player>
+    permission: mcplatform.punish.history
   warn:
     description: Warn a player.
     usage: /warn <player> [grund]

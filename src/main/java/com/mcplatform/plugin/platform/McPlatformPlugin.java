@@ -4,6 +4,7 @@ import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.FeatureRegistry;
 import com.mcplatform.plugin.feature.economy.EconomyFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
+import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.BackendClientConfig;
 import com.mcplatform.plugin.transport.GsonJsonCodec;
@@ -52,10 +53,15 @@ public final class McPlatformPlugin extends JavaPlugin {
 
         FeatureContext context = new FeatureContext(this, backend, eventBus, scheduler, config, getLogger());
 
+        // The ONE central menu listener (MENU_DESIGN). Created here in the composition root and injected
+        // into features — no generic platform class (FeatureContext/Registry/...) is touched to add menus.
+        MenuManager menus = new MenuManager(this, scheduler);
+        menus.register();
+
         // The ONE place features are plugged in. Add a feature = one more .register(...) line.
         this.features = new FeatureRegistry(getLogger())
-                .register(new EconomyFeature())
-                .register(new PunishmentFeature());
+                .register(new EconomyFeature(menus))
+                .register(new PunishmentFeature(menus));
         this.features.enableAll(context);
 
         // Connect the bus only after features have registered their subscriptions.

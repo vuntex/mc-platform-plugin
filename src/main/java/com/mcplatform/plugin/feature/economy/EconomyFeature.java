@@ -2,6 +2,7 @@ package com.mcplatform.plugin.feature.economy;
 
 import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.PluginFeature;
+import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.FeatureCache;
 import com.mcplatform.protocol.economy.BalanceChangedEventCodec;
 import com.mcplatform.protocol.economy.EconomyChannels;
@@ -23,6 +24,12 @@ public final class EconomyFeature implements PluginFeature {
     static final String CURRENCY = "COINS";
 
     private final FeatureCache<UUID, Long> balances = new FeatureCache<>();
+    private final MenuManager menus;
+
+    /** The shared menu manager is injected by the composition root — no generic class is touched. */
+    public EconomyFeature(MenuManager menus) {
+        this.menus = menus;
+    }
 
     @Override
     public String id() {
@@ -31,13 +38,17 @@ public final class EconomyFeature implements PluginFeature {
 
     @Override
     public void onEnable(FeatureContext context) {
-        // Live updates: version-checked cache refresh from mc:economy:balance.
+        // Live updates: version-checked cache refresh from mc:economy:balance, then nudge any open LIVE
+        // balance menu for that player to re-render its value slot (same stream, new consumer).
         context.eventBus().subscribe(EconomyChannels.BALANCE, BalanceChangedEventCodec.INSTANCE,
-                event -> EconomyBalances.apply(balances, event, CURRENCY));
+                event -> {
+                    EconomyBalances.apply(balances, event, CURRENCY);
+                    menus.liveBus().notifyChange(event.playerUuid());
+                });
 
-        // /balance: cache-first, REST fallback.
+        // /balance: opens the LIVE balance menu (cache-first, REST fallback for a cold cache).
         context.registerCommand("balance",
-                new BalanceCommand(context.backend(), context.scheduler(), balances, CURRENCY));
+                new BalanceCommand(context.backend(), context.scheduler(), balances, CURRENCY, menus));
 
         // Join → backend session + cache warmup; quit → cache eviction.
         context.registerListener(new PlayerJoinListener(

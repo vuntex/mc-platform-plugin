@@ -3,6 +3,7 @@ package com.mcplatform.plugin.feature.punishment;
 import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.PluginFeature;
 import com.mcplatform.plugin.platform.PlatformScheduler;
+import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.FeatureCache;
 import com.mcplatform.protocol.punishment.PunishmentChangedEventCodec;
@@ -28,6 +29,12 @@ import java.util.UUID;
 public final class PunishmentFeature implements PluginFeature {
 
     private final FeatureCache<UUID, PunishmentSnapshot> active = new FeatureCache<>();
+    private final MenuManager menus;
+
+    /** The shared menu manager is injected by the composition root — no generic class is touched. */
+    public PunishmentFeature(MenuManager menus) {
+        this.menus = menus;
+    }
 
     @Override
     public String id() {
@@ -51,6 +58,7 @@ public final class PunishmentFeature implements PluginFeature {
         context.registerCommand("punish", new PunishCommand(backend, scheduler));
         context.registerCommand("unpunish", new UnpunishCommand(backend, scheduler));
         context.registerCommand("history", new HistoryCommand(backend, scheduler));
+        context.registerCommand("punishments", new PunishmentMenuCommand(backend, scheduler, menus));
         context.registerCommand("warn",
                 new IssuePunishmentCommand(backend, scheduler, PunishmentType.WARN, false, "mcplatform.punish.warn"));
         context.registerCommand("tempban",
