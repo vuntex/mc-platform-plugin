@@ -43,4 +43,17 @@ class PunishmentMenuTextTest {
         MenuMessage msg = PunishmentMenuText.revokeError(new RuntimeException("boom"));
         assertTrue(msg.text().text().toLowerCase().contains("fehlgeschlagen"));
     }
+
+    @Test
+    void issueForbiddenIsAPermissionMessage() {
+        MenuMessage msg = PunishmentMenuText.issueError(BackendException.fromStatus(403, "no"));
+        assertEquals(Token.NEGATIVE, msg.text().token());
+        assertTrue(msg.text().text().toLowerCase().contains("berechtigung"));
+    }
+
+    @Test
+    void issueConflictReportsAlreadyActive() {
+        MenuMessage msg = PunishmentMenuText.issueError(BackendException.fromStatus(409, "dup"));
+        assertTrue(msg.text().text().toLowerCase().contains("bereits"));
+    }
 }

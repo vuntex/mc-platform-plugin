@@ -8,6 +8,12 @@ commands:
   balance:
     description: Shows your COINS balance (live, read from the backend).
     usage: /balance
+  pay:
+    description: Open the transfer menu to send COINS to another player.
+    usage: /pay
+  menu:
+    description: Open the main hub menu.
+    usage: /menu
   punish:
     description: Issue a punishment from a template (or list applicable templates).
     usage: /punish <player> [template] [grund]
@@ -24,6 +30,10 @@ commands:
     description: Open the paginated punishment history menu for a player.
     usage: /punishments <player>
     permission: mcplatform.punish.history
+  punishmenu:
+    description: Open the punish menu (pick a target, choose a template).
+    usage: /punishmenu [player]
+    permission: mcplatform.punish
   warn:
     description: Warn a player.
     usage: /warn <player> [grund]

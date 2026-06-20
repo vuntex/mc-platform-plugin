@@ -50,6 +50,10 @@ public final class EconomyFeature implements PluginFeature {
         context.registerCommand("balance",
                 new BalanceCommand(context.backend(), context.scheduler(), balances, CURRENCY, menus));
 
+        // /pay: player-side transfer flow (recipient picker → amount editor → confirm → TRANSFER).
+        context.registerCommand("pay",
+                new PayCommand(context.backend(), context.scheduler(), CURRENCY, menus));
+
         // Join → backend session + cache warmup; quit → cache eviction.
         context.registerListener(new PlayerJoinListener(
                 context.backend(), context.scheduler(), balances, CURRENCY, context.logger()));

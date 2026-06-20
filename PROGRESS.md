@@ -601,3 +601,66 @@ Kein Anfassen von `platform`/`transport`/Main (außer der einen `.register`-Zeil
 - **Danach (Schritt 5):** SSE-Live-Push ans Webinterface (subscribt ebenfalls auf
   `mc:economy:balance`) und Config-CRUD/-Audit; in die Breite weitere Economy-Operationen und Features
   (jeweils über denselben FeatureRegistry-Anstech-Punkt).
+
+## 10. Menü-Framework (Inventar-GUIs, Adventure) + Feature-Menüs
+
+Umsetzung von `MENU_DESIGN.md` als wiederverwendbares Framework in `platform/menu` — **ohne Änderung
+an einer einzigen generischen Klasse** (FeatureContext, FeatureRegistry, PluginFeature, FeatureCache,
+EventBus, BackendClient, PlatformScheduler bleiben unangetastet). Der `MenuManager` wird im
+Composition-Root (`McPlatformPlugin`) erzeugt, einmal als Listener registriert und per Konstruktor in
+die Features injiziert — das ist der Anstech-Punkt, kein Sonderweg.
+
+### Kern-Framework
+- **Reines Modell (Bukkit-frei, unit-testbar):** `Menu` (Größe/Titel/Slot→`MenuItem`, Routing),
+  `MenuItem` (Icon + Handler **pro `ClickAction`** — kein globales switch), `MenuBuilder`
+  (Border-Füllung, feste Slots 4/48/49/45/53, 7×4-Paginierung), `ConfirmDialog` (§2.5; kritisch =
+  Doppelklick), `Pagination`, `MenuLayout`, semantische Tokens/Icons/Feedback, `Lore`/`LoreLine`
+  (mehrfarbiger Aktions-Hinweis §3.3), `PlayerPickerMenu` (geteilter paginierter Spieler-Picker).
+- **Bukkit/Adventure-Schicht (nur in-game, nie von Tests geladen):** `MenuManager` (DER eine
+  Click/Close/Drag-Listener, cancelt immer, routet, LIVE-Sub/-Unsub), `MenuRenderer`, `MenuStyle`
+  (Token→Farbe, Icon→Material, Feedback→Sound, Component-Bau, Italic aus), `MenuHolder`,
+  `BukkitMenuView`. `compileOnly` paper-api ⇒ Tests laufen ohne Server, daher die strikte Trennung.
+- **LIVE vs. STATIC (§6):** `MenuLiveBus` (keyed Observer-Fan-out) + `OpenMenuTracker` melden beim
+  Close sauber ab — kein Observer-Leak (explizit für 200 Spieler getestet). LIVE-Daten kommen über
+  denselben EventBus→`FeatureCache`-Strom; das Feature ruft nach dem Cache-Update
+  `menus.liveBus().notifyChange(topic)`. **Generik-Lücke gemeldet:** `FeatureCache`/`EventBus` haben
+  keinen Observer-/Unsubscribe-Hook, deshalb sitzt die Beobachtung im Menü-Framework statt im Cache.
+
+### Spielerseitig (jeder für sich)
+- **Balance-Menü (LIVE, Single-Value):** `/balance` öffnet ein Menü; Wert-Slot aktualisiert sich live
+  bei Balance-Änderung. *LIVE, weil Einzelwert, der sich durch fremde Transaktionen ändert.*
+- **Transfer-Flow:** `/pay` → Spieler-Picker → `TransferMenu` (Wert-Editor −/+ mit Shift-Schritt,
+  §4.6, keine Eingabe neu erfunden) → Confirm-Dialog → `TRANSFER`. **422** (insufficient) und **400**
+  (Self-Transfer/ungültig) werden sauber im Menü gezeigt. *STATIC, Wert ändert sich nur durch eigene
+  Klicks.*
+
+### Team-seitig (hinter dem Backend-Gate, UI-Gate optimistisch)
+- **Punish-Menü:** `/punishmenu [player]` → ggf. Picker → `PunishMenu`: Templates aus `GET /templates`,
+  **`canApply=true` interaktiv/hervorgehoben, sonst sichtbar-aber-gesperrt** (`IRON_BARS`, muted);
+  inaktive Templates ausgeblendet → Confirm → `from-template`. **403** (keine Berechtigung) / **409**
+  (bereits aktiv) sauber im Menü. *STATIC (Snapshot).*
+- **History-Menü:** `/punishments <player>` — paginierte Liste, **aktiv vs. abgelaufen** optisch
+  getrennt (aktiv: Schwert/Sperr-Icon, rot, klickbar; abgelaufen: Buch, muted, nur Anzeige), Revoke
+  über kritischen Confirm-Dialog (Doppelklick), respektiert das Backend-`REVOKE`-Gate (403). *STATIC.*
+- **Template-Verwaltung (CRUD):** bewusst **nicht** im Menü umgesetzt — gehört ins Webinterface
+  (Backend-Template-CRUD); nur Auswahl/Anwendung läuft übers Plugin-Menü.
+
+### Quer
+- **Hub-Menü:** `/menu` zeigt nur erlaubte Einträge (Economy für alle; Strafverwaltung nur mit
+  `mcplatform.punish`). Optimistisches UI-Gate; jede echte Aktion bleibt backend-geprüft. Einträge
+  starten die jeweiligen Feature-Commands → Hub bleibt von den Feature-Menüs entkoppelt. *STATIC.*
+
+### Threading & Lade-Zustand (alle Menüs)
+- Inventar-Ops im Main-Thread; Daten async über `BackendClient`, Aufbau via `PlatformScheduler` zurück
+  in Main. Menüs öffnen sofort in „Lade…" und füllen sich, wenn die Daten da sind — Main nie blockiert.
+
+### Tests grün (`./gradlew build`, 113 Tests, 0 Fehler)
+- Framework: `MenuLayoutTest`, `PaginationTest`, `MenuBuilderTest`, `MenuRoutingTest`,
+  `ConfirmDialogTest`, `MenuLiveBusTest` (+ Leak/200), `OpenMenuTrackerTest`, `PlayerPickerMenuTest`.
+- Economy: `BalanceMenuTest` (LIVE-Slot-Update), `EconomyMenuTextTest`, `TransferMenuTest`
+  (Wert-Editor-Grenzen, Confirm, **422-Pfad**, Success-Close).
+- Punishments: `PunishmentHistoryMenuTest` (Paginierung/Confirm/**403**/Success),
+  `PunishMenuTest` (**canApply-Gating**, **403**-Pfad, Success), `PunishmentMenuTextTest` (403/409/404).
+- Hub: `HubMenuTest` (berechtigter vs. unberechtigter Spieler → unterschiedliche Einträge).
+- **Bestätigt:** Alle Menüs ohne Änderung an generischen Klassen; `MenuManager` ist der einzige
+  `InventoryClickEvent`-Listener.

@@ -59,6 +59,7 @@ public final class PunishmentFeature implements PluginFeature {
         context.registerCommand("unpunish", new UnpunishCommand(backend, scheduler));
         context.registerCommand("history", new HistoryCommand(backend, scheduler));
         context.registerCommand("punishments", new PunishmentMenuCommand(backend, scheduler, menus));
+        context.registerCommand("punishmenu", new PunishMenuCommand(backend, scheduler, menus));
         context.registerCommand("warn",
                 new IssuePunishmentCommand(backend, scheduler, PunishmentType.WARN, false, "mcplatform.punish.warn"));
         context.registerCommand("tempban",

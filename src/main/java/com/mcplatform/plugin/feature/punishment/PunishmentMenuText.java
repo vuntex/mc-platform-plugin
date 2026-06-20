@@ -35,6 +35,24 @@ final class PunishmentMenuText {
         return MenuMessage.chat("Strafe aufgehoben.", Token.POSITIVE);
     }
 
+    /** Map an issue-from-template failure: {@code 403 → no permission}, {@code 409 → already active}. */
+    static MenuMessage issueError(Throwable error) {
+        Throwable cause = unwrap(error);
+        if (cause instanceof BackendException be) {
+            return switch (be.statusCode()) {
+                case 403 -> MenuMessage.chat("Das Backend hat die Strafe abgelehnt: keine Berechtigung.", Token.NEGATIVE);
+                case 409 -> MenuMessage.chat("Es existiert bereits eine aktive Strafe dieser Art.", Token.NEGATIVE);
+                default -> MenuMessage.chat("Strafe konnte nicht gesetzt werden – bitte erneut versuchen.", Token.NEGATIVE);
+            };
+        }
+        return MenuMessage.chat("Strafe konnte nicht gesetzt werden – bitte erneut versuchen.", Token.NEGATIVE);
+    }
+
+    /** Success confirmation after issuing a punishment. */
+    static MenuMessage issueSuccess(String templateKey, String targetName) {
+        return MenuMessage.chat("Strafe '" + templateKey + "' für " + targetName + " gesetzt.", Token.POSITIVE);
+    }
+
     private static Throwable unwrap(Throwable t) {
         Throwable current = t;
         while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)
