@@ -664,3 +664,31 @@ die Features injiziert — das ist der Anstech-Punkt, kein Sonderweg.
 - Hub: `HubMenuTest` (berechtigter vs. unberechtigter Spieler → unterschiedliche Einträge).
 - **Bestätigt:** Alle Menüs ohne Änderung an generischen Klassen; `MenuManager` ist der einzige
   `InventoryClickEvent`-Listener.
+
+## Reports (#47) — Plugin-Slice (drittes Feature, `feature.report`)
+Reiner Client gegen den fertigen Backend-Contract (`com.mcplatform.protocol.report`). Angesteckt mit
+**einer** `.register(new ReportFeature(menus))`-Zeile + additiven `plugin.yml`-Einträgen — **keine
+generische Klasse geändert** (verifiziert per Diff). Spec/Plan/Tasks unter `specs/001-reports-client/`.
+
+- **Erstellen (offen für alle):** `/report <spieler>` → STATIC-Kategorie-Menü (5 Kategorien) →
+  **Chat-Input-Grund** (MENU_DESIGN-Fallback, da kein Anvil-Input existiert): `ReportChatInputListener`
+  konsumiert auf `LOWEST` die nächste Chat-Zeile (cancelt sie, Abbruch-Wort `abbrechen`), schickt
+  `CREATE` mit dem **globalen Chat-Schnappschuss**. Eingangsbestätigung an den Reporter. **422**
+  (Self-Report/leer) & **429** (Cooldown) sauber gemeldet.
+- **Chat-Ringpuffer:** `ChatRingBuffer` — globaler RAM-Ring der letzten ~20 **öffentlichen** Nachrichten
+  (`PublicChatListener` auf `MONITOR`, `ignoreCancelled=true` → gemutete/konsumierte Zeilen & PNs außen
+  vor). Thread-safe, nicht persistent.
+- **Team-Inbox (LIVE):** `/reports` → `ReportInboxMenu` listet **alle** offenen Reports (geteilte
+  Warteschlange; `staff`=Identität, kein Filter), paginiert (28er-Grid), neueste zuerst; Detail inkl.
+  **Chat-Kontext** (Köpfe je Absender) und — nur mit `mcplatform.report.handle` — die erlaubten
+  Status-Buttons (OPEN→IN_PROGRESS/REJECTED, IN_PROGRESS→RESOLVED/REJECTED) via Confirm →
+  `CHANGE_STATUS`. **403/404/409** sauber. LIVE-Binding meldet sich beim Close ab (`MenuManager`).
+- **Live-Benachrichtigung:** `subscribe(mc:report:changed, ReportChangedEventCodec.INSTANCE, …)` über
+  dieselbe `PlatformProtocol.create()`. CREATED → `ReportNotifier` pingt online-Träger von
+  `mcplatform.report.view` (Chat-Zeile + Ton); jede Änderung → offene Inbox liest per `LIST_OPEN` neu
+  (`notifyChange(INBOX_TOPIC)`), „latest-request-wins"-Guard gegen Out-of-order.
+- **403/429 ohne Muster-Leck:** `BackendException.fromStatus` liefert beide als `BackendError` mit
+  `statusCode()`; `ReportFormat.errorText` inspiziert den Code feature-lokal — die sealed
+  `BackendException` bleibt unverändert.
+- **Tests grün:** 17 Report-Tests (`ReportFormatTest`, `ChatRingBufferTest`, `ReportReasonPromptTest`,
+  `ReportLiveUpdaterTest`, `ReportInboxMenuTest`), `./gradlew build` grün, JAR erzeugt.

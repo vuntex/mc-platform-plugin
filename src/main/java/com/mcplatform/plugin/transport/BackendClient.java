@@ -2,6 +2,7 @@ package com.mcplatform.plugin.transport;
 
 import com.mcplatform.protocol.core.EndpointDescriptor;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -31,6 +32,19 @@ public interface BackendClient {
      * @param pathVars values for the {@code {...}} placeholders, in template order
      */
     <REQ, RES> CompletableFuture<RES> call(EndpointDescriptor<REQ, RES> endpoint, REQ body, String... pathVars);
+
+    /**
+     * Like {@link #call(EndpointDescriptor, Object, String...)} but also appends {@code query} as URL
+     * query parameters (filters, a keyset cursor, a page limit). Entries whose value is {@code null} or
+     * blank are skipped by the implementation. GET stays idempotent → retried.
+     *
+     * <p>The default ignores {@code query} and delegates to {@link #call}, so non-HTTP fakes (tests,
+     * stubs) need not implement query handling — only the real {@code HttpBackendClient} appends it.
+     */
+    default <REQ, RES> CompletableFuture<RES> call(
+            EndpointDescriptor<REQ, RES> endpoint, REQ body, Map<String, String> query, String... pathVars) {
+        return call(endpoint, body, pathVars);
+    }
 
     /**
      * Call {@code endpoint} treating it as idempotent → retried on transient failures. Use ONLY when

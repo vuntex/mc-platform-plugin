@@ -11,6 +11,9 @@ commands:
   pay:
     description: Open the transfer menu to send COINS to another player.
     usage: /pay
+  transactions:
+    description: Open the paginated, filterable transaction history (your own, or another player's).
+    usage: /transactions [player]
   menu:
     description: Open the main hub menu.
     usage: /menu
@@ -50,10 +53,20 @@ commands:
     description: Permanently ban a player.
     usage: /permaban <player> [grund]
     permission: mcplatform.punish.permaban
+  report:
+    description: Report a player (category menu + chat reason). Open to all.
+    usage: /report <spieler>
+  reports:
+    description: Open the team inbox of open reports (LIVE).
+    usage: /reports
+    permission: mcplatform.report.view
 
 # Optimistic UI-gate only. The backend is the real authority on who may apply which
 # template/action and rejects with 403; these defaults just keep the in-game UX sane.
 permissions:
+  mcplatform.economy.history.others:
+    description: View other players' economy transaction history via /transactions <player>.
+    default: op
   mcplatform.punish:
     description: Use /punish and view applicable templates.
     default: op
@@ -74,4 +87,10 @@ permissions:
     default: op
   mcplatform.punish.permaban:
     description: Use /permaban.
+    default: op
+  mcplatform.report.view:
+    description: See the report inbox and receive live new-report notifications.
+    default: op
+  mcplatform.report.handle:
+    description: Set report status (in progress / resolved / rejected).
     default: op

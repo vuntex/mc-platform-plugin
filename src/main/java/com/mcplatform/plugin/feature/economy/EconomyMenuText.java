@@ -34,6 +34,15 @@ final class EconomyMenuText {
         return MenuMessage.chat(amount + " " + currency + " an " + toName + " gesendet.", Token.POSITIVE);
     }
 
+    static MenuMessage historyError(Throwable error) {
+        Throwable cause = unwrap(error);
+        if (cause instanceof BackendException be && be.statusCode() == 404) {
+            return MenuMessage.actionBar("Keine Kontobewegungen gefunden.", Token.MUTED);
+        }
+        return MenuMessage.actionBar("Historie konnte nicht geladen werden – bitte erneut versuchen.",
+                Token.NEGATIVE);
+    }
+
     private static Throwable unwrap(Throwable t) {
         Throwable current = t;
         while ((current instanceof CompletionException || current instanceof java.util.concurrent.ExecutionException)

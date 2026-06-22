@@ -70,7 +70,7 @@ final class PunishmentFormat {
         if (m > 0) {
             sb.append(m).append("m ");
         }
-        if (secs > 0 || sb.length() == 0) {
+        if (secs > 0 || sb.isEmpty()) {
             sb.append(secs).append("s");
         }
         return sb.toString().trim();
