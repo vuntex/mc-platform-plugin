@@ -33,4 +33,18 @@ final class PunishmentType {
     static boolean isTimeBound(String type) {
         return TEMPBAN.equals(type) || CHATBAN.equals(type);
     }
+
+    /**
+     * Bukkit permission node that gates the staff broadcast for a punishment of this type. Reuses the
+     * per-type issue permissions, so team members who may apply a type also see those actions happen.
+     */
+    static String notifyPermission(String type) {
+        return switch (type) {
+            case WARN -> "mcplatform.punish.warn";
+            case CHATBAN -> "mcplatform.punish.chatban";
+            case TEMPBAN -> "mcplatform.punish.tempban";
+            case PERMABAN -> "mcplatform.punish.permaban";
+            default -> "mcplatform.punish";
+        };
+    }
 }

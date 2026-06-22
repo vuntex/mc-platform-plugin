@@ -76,6 +76,33 @@ final class PunishmentFormat {
         return sb.toString().trim();
     }
 
+    /**
+     * Coarse duration for player-facing notices: rounds UP to the next minute and drops seconds, so a
+     * remaining {@code 1h 59m 59s} reads as {@code 2h} instead of a noisy ticking value. Sub-minute
+     * remainders show as {@code 1m}.
+     */
+    static String formatDurationCoarse(long millis) {
+        if (millis <= 0L) {
+            return "0s";
+        }
+        long minutes = (millis + 59_999L) / 60_000L; // ceil to whole minutes
+        long d = minutes / 1_440L;
+        minutes %= 1_440L;
+        long h = minutes / 60L;
+        long m = minutes % 60L;
+        StringBuilder sb = new StringBuilder();
+        if (d > 0) {
+            sb.append(d).append("d ");
+        }
+        if (h > 0) {
+            sb.append(h).append("h ");
+        }
+        if (m > 0 || sb.isEmpty()) {
+            sb.append(m).append("m");
+        }
+        return sb.toString().trim();
+    }
+
     /** Player-facing disallow/kick screen for a (temp/perma)ban. Shows remaining time for a TEMPBAN. */
     static String banScreen(String type, String reason, long expiresAtEpochMilli, long nowEpochMilli) {
         StringBuilder sb = new StringBuilder();
@@ -87,14 +114,6 @@ final class PunishmentFormat {
             sb.append("§7Dauer: §fpermanent");
         }
         return sb.toString();
-    }
-
-    /** In-chat notice when a muted player tries to talk. Shows remaining time for a time-bound chatban. */
-    static String chatbanNotice(String reason, long expiresAtEpochMilli, long nowEpochMilli) {
-        String remaining = expiresAtEpochMilli > 0
-                ? " §7(noch " + formatDuration(expiresAtEpochMilli - nowEpochMilli) + ")"
-                : "";
-        return "§cDu bist im Chat gesperrt: §f" + reason + remaining;
     }
 
     /**
