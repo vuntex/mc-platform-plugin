@@ -5,6 +5,8 @@ import com.mcplatform.plugin.feature.FeatureRegistry;
 import com.mcplatform.plugin.feature.economy.EconomyFeature;
 import com.mcplatform.plugin.feature.hub.HubFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
+import com.mcplatform.plugin.feature.report.ReportFeature;
+import com.mcplatform.plugin.feature.session.SessionFeature;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.BackendClientConfig;
@@ -61,8 +63,10 @@ public final class McPlatformPlugin extends JavaPlugin {
 
         // The ONE place features are plugged in. Add a feature = one more .register(...) line.
         this.features = new FeatureRegistry(getLogger())
+                .register(new SessionFeature()) // platform session gate — established first
                 .register(new EconomyFeature(menus))
                 .register(new PunishmentFeature(menus))
+                .register(new ReportFeature(menus))
                 .register(new HubFeature(menus));
         this.features.enableAll(context);
 

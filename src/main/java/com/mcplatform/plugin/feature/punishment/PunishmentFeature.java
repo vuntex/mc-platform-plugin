@@ -2,6 +2,7 @@ package com.mcplatform.plugin.feature.punishment;
 
 import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.PluginFeature;
+import com.mcplatform.plugin.platform.Cooldowns;
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.BackendClient;
@@ -30,6 +31,7 @@ public final class PunishmentFeature implements PluginFeature {
 
     private final FeatureCache<UUID, PunishmentSnapshot> active = new FeatureCache<>();
     private final MenuManager menus;
+    private AutoCloseable muteWatcher;
 
     /** The shared menu manager is injected by the composition root — no generic class is touched. */
     public PunishmentFeature(MenuManager menus) {
@@ -47,10 +49,14 @@ public final class PunishmentFeature implements PluginFeature {
         context.eventBus().subscribe(PunishmentChannels.CHANGED, PunishmentChangedEventCodec.INSTANCE,
                 new PunishmentLiveUpdater(active));
 
-        // Enforcement listeners.
+        // Enforcement listeners. The shared cooldown utility throttles the mute appeal message.
+        Cooldowns cooldowns = new Cooldowns();
         context.registerListener(new PunishmentLoginListener(context.backend(), active, context.logger()));
-        context.registerListener(new PunishmentChatListener(active));
+        context.registerListener(new PunishmentChatListener(active, cooldowns));
         context.registerListener(new PunishmentQuitListener(active));
+
+        // Poll once per second: notify a player in chat the moment their mute ends (expiry fires no event).
+        this.muteWatcher = context.scheduler().runSyncTimer(new MuteExpiryWatcher(active), 20L, 20L);
 
         // Team commands (optimistic Bukkit-permission UI-gate; backend is authoritative via 403).
         BackendClient backend = context.backend();
@@ -68,5 +74,16 @@ public final class PunishmentFeature implements PluginFeature {
                 new IssuePunishmentCommand(backend, scheduler, PunishmentType.CHATBAN, true, "mcplatform.punish.chatban"));
         context.registerCommand("permaban",
                 new IssuePunishmentCommand(backend, scheduler, PunishmentType.PERMABAN, false, "mcplatform.punish.permaban"));
+    }
+
+    @Override
+    public void onDisable() {
+        if (muteWatcher != null) {
+            try {
+                muteWatcher.close();
+            } catch (Exception ignored) {
+                // Bukkit also cancels plugin tasks on disable; this is just tidy-up.
+            }
+        }
     }
 }

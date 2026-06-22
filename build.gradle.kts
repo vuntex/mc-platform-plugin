@@ -34,6 +34,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // Paper API on the test classpath too (compile + runtime), so tests can build and verify
+    // Adventure Component output (e.g. the punishment chat notice) without a running server.
+    testImplementation("io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT")
+
     // Live EventBus proof against a real Redis (like the backend's infra-cache tests).
     // Docker-gated at runtime (assumeTrue) so the build stays green where Docker is absent.
     testImplementation("org.testcontainers:junit-jupiter:1.20.4")

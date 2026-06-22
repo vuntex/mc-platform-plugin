@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -90,7 +91,8 @@ public final class PunishMenuCommand implements CommandExecutor {
     private void openPunish(Player viewer, UUID target, String targetName) {
         PunishMenu punishMenu = new PunishMenu(target, targetName, backend, scheduler);
         MenuView view = menus.open(viewer, punishMenu.menu());
-        backend.call(PunishmentEndpoints.LIST_TEMPLATES, null)
+        Map<String, String> query = Map.of("staff", viewer.getUniqueId().toString());
+        backend.call(PunishmentEndpoints.LIST_TEMPLATES, null, query)
                 .whenComplete((templates, error) -> scheduler.runSync(() -> {
                     TemplateResponse[] list = templates == null ? new TemplateResponse[0] : templates;
                     punishMenu.setTemplates(Arrays.asList(list));

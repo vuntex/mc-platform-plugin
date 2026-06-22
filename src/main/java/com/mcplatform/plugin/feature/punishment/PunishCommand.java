@@ -11,6 +11,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -80,7 +81,10 @@ public final class PunishCommand implements CommandExecutor {
 
     /** UI-gate: list only templates the member may apply (per the template's requiredPermission). */
     private void listTemplates(CommandSender sender, String targetName) {
-        backend.call(PunishmentEndpoints.LIST_TEMPLATES, null)
+        // The backend requires the acting staff UUID as a query param (LIST_TEMPLATES is a bodyless GET,
+        // so it cannot ride in a request body like the issue/revoke writes do).
+        Map<String, String> query = Map.of("staff", PunishmentCommandSupport.issuedBy(sender).toString());
+        backend.call(PunishmentEndpoints.LIST_TEMPLATES, null, query)
                 .whenComplete((templates, error) -> scheduler.runSync(() -> {
                     if (error != null || templates == null) {
                         sender.sendMessage(PunishmentFormat.backendError(error));

@@ -44,6 +44,9 @@ public final class PunishmentLoginListener implements Listener {
 
     @EventHandler
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+        if (event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
+            return; // the session gate (LOWEST) already refused — skip the (doomed) backend round-trip
+        }
         UUID uuid = event.getUniqueId();
         try {
             PunishmentResponse[] active = backend
