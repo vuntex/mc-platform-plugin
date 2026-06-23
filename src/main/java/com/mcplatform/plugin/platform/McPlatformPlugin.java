@@ -4,6 +4,7 @@ import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.FeatureRegistry;
 import com.mcplatform.plugin.feature.economy.EconomyFeature;
 import com.mcplatform.plugin.feature.hub.HubFeature;
+import com.mcplatform.plugin.feature.permission.PermissionFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
 import com.mcplatform.plugin.feature.report.ReportFeature;
 import com.mcplatform.plugin.feature.session.SessionFeature;
@@ -67,6 +68,7 @@ public final class McPlatformPlugin extends JavaPlugin {
                 .register(new EconomyFeature(menus))
                 .register(new PunishmentFeature(menus))
                 .register(new ReportFeature(menus))
+                .register(new PermissionFeature(menus))
                 .register(new HubFeature(menus));
         this.features.enableAll(context);
 

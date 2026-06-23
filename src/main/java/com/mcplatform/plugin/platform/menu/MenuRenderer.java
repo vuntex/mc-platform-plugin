@@ -43,7 +43,11 @@ final class MenuRenderer {
 
     private ItemStack toStack(MenuItem item) {
         IconSpec icon = item.icon();
-        ItemStack stack = new ItemStack(MenuStyle.material(icon.icon()));
+        // Escape hatch: a feature-resolved item (e.g. a role's display_icon) is cloned as-is; otherwise
+        // resolve the closed Icon enum's material as before.
+        ItemStack stack = icon.baseItem() != null
+                ? icon.baseItem().clone()
+                : new ItemStack(MenuStyle.material(icon.icon()));
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
             return stack;
@@ -55,7 +59,7 @@ final class MenuRenderer {
         if (!icon.lore().isEmpty()) {
             meta.lore(MenuStyle.lore(icon.lore()));
         }
-        if (icon.icon().hideAttributes()) {
+        if (icon.baseItem() != null || icon.icon().hideAttributes()) {
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         }
         if (icon.glow()) {

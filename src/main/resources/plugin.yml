@@ -60,6 +60,15 @@ commands:
     description: Open the team inbox of open reports (LIVE).
     usage: /reports
     permission: mcplatform.report.view
+  rank:
+    description: Read-only tool to turn the held item into a display_icon string (click-to-copy).
+    usage: /rank toDisplayIcon
+  ranks:
+    description: Open the role management menu (create/edit roles, role permissions).
+    usage: /ranks
+  cp:
+    description: Open the control panel for a player (grant/revoke ranks and permissions).
+    usage: /cp <Spieler>
 
 # Optimistic UI-gate only. The backend is the real authority on who may apply which
 # template/action and rejects with 403; these defaults just keep the in-game UX sane.

@@ -692,3 +692,52 @@ generische Klasse geändert** (verifiziert per Diff). Spec/Plan/Tasks unter `spe
   `BackendException` bleibt unverändert.
 - **Tests grün:** 17 Report-Tests (`ReportFormatTest`, `ChatRingBufferTest`, `ReportReasonPromptTest`,
   `ReportLiveUpdaterTest`, `ReportInboxMenuTest`), `./gradlew build` grün, JAR erzeugt.
+
+## Permission/Rank-System — Plugin-Slice (viertes Feature, `feature.permission`)
+
+Reiner Paper-Client zum fertigen, autoritativen Backend (`002-permission-rank-system`). Alles additiv in
+`feature.permission` + **einer** `FeatureRegistry`-Zeile. Spec/Plan/Tasks: `specs/002-permission-rank-client/`.
+
+- **Live-Cache (US2):** `PermissionCache` über die **generische** `FeatureCache<UUID, PlayerPermissionsView>`
+  (unverändert), version-aware mit `timestampEpochMilli`. **Kaltstart = PreLogin-Warmup, fail-closed:**
+  `PermissionWarmupListener` (`AsyncPlayerPreLoginEvent`, `HIGHEST`, nur wenn Login noch `ALLOWED`) lädt
+  blockierend `GET …/effective` (async PreLogin-Thread, Main-Thread nie blockiert) und schreibt den Cache
+  **bevor** der Spieler die Welt betritt; Backend down/leer → `disallow(KICK_OTHER)` (harter Kick, exakt wie
+  der Session-Gate). `PermissionQuitListener`: Quit → evict. Damit hat ein In-World-Spieler **garantiert** einen
+  warmen Cache. **Laufzeit-Änderungen** sind unabhängig: `PermissionLiveUpdater` abonniert `mc:permission:changed`
+  (`PermissionChangedEventCodec.INSTANCE`, schon in `PlatformProtocol.create()`): online → **nur die betroffene
+  UUID** neu laden, offline → ignorieren; jeder changeType (auch unbekannt) → reload. Beide Mechanismen koexistieren.
+- **Cache-basiertes Gate (US3):** `PermissionGate.has(uuid, node)` liest den Cache. Eintrag + Node (inkl.
+  Wildcards `*` / Ancestor-`x.y.*` / exakt via `grants(...)`) → erlauben; Eintrag ohne Node → sperren;
+  **Cold-Cache → strict-deny + Warnlog** („permission check on cold cache … warmup gap?") — kein optimistisches
+  Durchwinken mehr, da der PreLogin-Warmup einen warmen Cache garantiert; ein kalter Cache ist jetzt ein
+  Bug-Indikator. Backend (`403`) bleibt die Wahrheit. Feingranulare Nodes `mcplatform.permission.roles.manage`
+  / `…grants.manage` (Cache-geprüft; **kein** blockierendes `plugin.yml`-Permission auf den Commands).
+- **display_icon — zwei Richtungen, ein Format (`DisplayIconFormat`):** `IconResolver` (String→`ItemStack`,
+  `material:`/`head-texture:`/`head-player:` via Paper-`PlayerProfile`, **kein NMS**; null/unbekannt/ungültig →
+  sichtbares Fallback `BARRIER`); `IconExtractor` + `/rank toDisplayIcon` (in-Hand-Item → `material:`/
+  `head-texture:<base64>`, click-to-copy; **kein** Backend-Call). Reine Logik (`DisplayIconFormat.parse`,
+  `IconExtractor.choose`) voll unit-getestet.
+- **Staff-Menüs (US1), alle STATIC:** `/ranks` → `RoleListMenu` (paginiert, Icon je Rolle via Resolver,
+  interaktiver „Anlegen"-Header) → `RoleDetailMenu` (Umbenennen `UPDATE_ROLE`, Permissions `RolePermissionsMenu`
+  add/remove, Löschen via `ConfirmDialog.critical()` → `DELETE_ROLE` mit actor-Query) ; `/cp <Spieler>` →
+  `PlayerGrantsMenu` (online **und** offline, Name→UUID off-main; Grant/Revoke Rang+Permission, Re-Render aus
+  der `PlayerPermissionsResponse`). Kurze Texteingaben über `PermissionInput` (Chat-Fallback §4.6 — das
+  Framework hat keinen Anvil-Helper). **Kein `MenuLiveBus`-Abo → kein Beobachter-Leak per Konstruktion.**
+- **Phase R0 (freigegeben, additiv): Icon-Notausgang in der Render-Schicht.** `IconSpec` +`baseItem` (`ItemStack`,
+  nullable) +`ofItem(...)`; `MenuRenderer.toStack()` klont `baseItem` und legt Name/Lore darüber. Nur so gelangt
+  der vom Feature gebaute `ItemStack` ins Menü. Rückwärtskompatibel — alle bestehenden Menü-Tests bleiben grün.
+- **Keine der sechs geschützten Generika geändert** (FeatureCache/EventBus/BackendClient/MenuBuilder/
+  PluginFeature/Scheduler). Bestands-Edits nur: 1 `.register(new PermissionFeature(menus))`, additive `plugin.yml`
+  (rank/ranks/cp), und der freigegebene R0 an `IconSpec`/`MenuRenderer`.
+- **⚠️ Offener Muster-Leck-Checkpoint (gemeldet, NICHT eigenmächtig geändert):** `HttpBackendClient.applyMethod`
+  sendet bei `DELETE` **keinen Body** (`builder.DELETE()`). `REVOKE_PERMISSION` ist `DELETE` **mit** Body
+  (`RevokePermissionRequest`) — der Feature-Code ruft contract-korrekt, aber der Body wird mit dem aktuellen
+  generischen Client nicht übertragen. Fix wäre einzeilig (`builder.method("DELETE", publisher)` wenn Body
+  vorhanden) an einer **generischen** Transport-Klasse → bewusst offen gelassen, Entscheidung des Auftraggebers.
+  `DELETE_ROLE`/`REVOKE_ROLE` (actor als Query, kein Body) funktionieren.
+- **Tests grün:** 32 Permission-Tests (`DisplayIconFormatTest`, `PermissionCacheTest`, `PermissionGateTest`
+  inkl. Wildcards + Cold-Cache-Deny, `PermissionFormatTest`, `PermissionLiveUpdaterTest`,
+  `PermissionWarmupListenerTest`, `IconChoiceTest`, `RoleListMenuTest`, `PlayerGrantsMenuTest`),
+  `./gradlew build` grün, JAR erzeugt. (Reine Logik voll getestet; ItemStack-Rendering + PreLogin-`disallow`-Glue
+  manuell verifiziert — kein MockBukkit im Projekt.)
