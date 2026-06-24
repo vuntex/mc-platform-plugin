@@ -9,6 +9,12 @@ backend:
   # Base backoff between retries (milliseconds); grows linearly per attempt.
   retry-backoff-ms: 200
 
+web:
+  # Clickable links handed to the player by /web. {token} is substituted with the one-time
+  # web-auth token. These URLs must match the web frontend's redeem routes (greenfield contract).
+  link-url: "http://localhost:3000/account/set-password?token={token}"
+  reset-url: "http://localhost:3000/account/reset-password?token={token}"
+
 redis:
   # Read-only Pub/Sub subscriber for live updates (e.g. mc:economy:balance).
   # The plugin only subscribes here; it never writes to Redis or reads backend-internal keys.

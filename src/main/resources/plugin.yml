@@ -69,6 +69,9 @@ commands:
   cp:
     description: Open the control panel for a player (grant/revoke ranks and permissions).
     usage: /cp <Spieler>
+  web:
+    description: Manage your web account (create a link, or reset your password).
+    usage: /web <link|resetPassword>
 
 # Optimistic UI-gate only. The backend is the real authority on who may apply which
 # template/action and rejects with 403; these defaults just keep the in-game UX sane.

@@ -8,6 +8,7 @@ import com.mcplatform.plugin.feature.permission.PermissionFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
 import com.mcplatform.plugin.feature.report.ReportFeature;
 import com.mcplatform.plugin.feature.session.SessionFeature;
+import com.mcplatform.plugin.feature.web.WebFeature;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.BackendClientConfig;
@@ -62,6 +63,13 @@ public final class McPlatformPlugin extends JavaPlugin {
         MenuManager menus = new MenuManager(this, scheduler);
         menus.register();
 
+        // Clickable web-account link templates ({token} is substituted). Read here in the composition
+        // root — exactly like the backend timeouts above — so no generic config/transport class changes.
+        String webLinkUrl = getConfig().getString(
+                "web.link-url", "http://localhost:3000/account/set-password?token={token}");
+        String webResetUrl = getConfig().getString(
+                "web.reset-url", "http://localhost:3000/account/reset-password?token={token}");
+
         // The ONE place features are plugged in. Add a feature = one more .register(...) line.
         this.features = new FeatureRegistry(getLogger())
                 .register(new SessionFeature()) // platform session gate — established first
@@ -69,7 +77,8 @@ public final class McPlatformPlugin extends JavaPlugin {
                 .register(new PunishmentFeature(menus))
                 .register(new ReportFeature(menus))
                 .register(new PermissionFeature(menus))
-                .register(new HubFeature(menus));
+                .register(new HubFeature(menus))
+                .register(new WebFeature(webLinkUrl, webResetUrl));
         this.features.enableAll(context);
 
         // Connect the bus only after features have registered their subscriptions.

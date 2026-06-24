@@ -749,3 +749,32 @@ Reiner Paper-Client zum fertigen, autoritativen Backend (`002-permission-rank-sy
   `PlayerRanksMenuTest` inkl. Picker-Ausschluss gehaltener Ränge, `PlayerPermissionsMenuTest`) + 2 Transport-Tests
   (DELETE-mit/ohne Body), `./gradlew build` grün, JAR erzeugt. (Reine Logik voll getestet; ItemStack-Rendering + PreLogin-`disallow`-Glue
   manuell verifiziert — kein MockBukkit im Projekt.)
+
+## Web-Auth-Bridge — Plugin-Slice (fünftes Feature, `feature.web`)
+
+Reiner Backend-Client gegen den fertigen Web-Auth-Contract (`com.mcplatform.protocol.webauth`,
+Backend-Slice `003-web-auth-bridge`). Angesteckt mit **einer** `.register(new WebFeature(...))`-Zeile +
+additivem `plugin.yml`-Eintrag (`web`) + `config.yml`-Sektion (`web.link-url`/`web.reset-url`) — **keine
+generische Klasse geändert** (kein Cache, kein `EventBus`, kein Listener: die Bridge hat bewusst keinen
+Live-/Pub-Sub-Pfad, R7).
+
+- **Commands (`/web`, online-only):** `/web link` → `WebAuthEndpoints.REQUEST_LINK`, `/web resetPassword`
+  → `REQUEST_RESET`, beide **POST** mit der UUID des Senders als einzige Pfadvariable (`Void`-Body) über
+  den generischen `BackendClient`. Die In-Game-Session beweist die Identität (UUID = Account-Besitz) →
+  keine Permission, keine Namensauflösung. `/web` ohne/mit unbekanntem Argument → kurze Hilfe; Konsole →
+  Hinweis (kein Crash). REST läuft async, die Chat-Antwort hüpft per `scheduler.runSync` auf den Main-Thread.
+- **Klickbarer Link (`WebMessages`, reine Adventure-Components, keine §-Codes, FR-025):** aus
+  `TokenResponse.token` baut `buildUrl(template, token)` die Frontend-URL (Token in das **konfigurierte**
+  Template `{token}` substituiert — keine hardcodierte URL) und liefert sie als `ClickEvent.openUrl`-
+  Komponente mit Hover; LINK = Account-Anlegen-Kontext, RESET = Passwort-zurücksetzen-Kontext.
+- **Fehler ohne Muster-Leck:** Beide Ablehnungen mappt das Backend auf **409** (`web_account_exists` vs.
+  `web_account_missing`) — pro Command eindeutig (jeder Fehler tritt nur an seinem eigenen Endpoint auf),
+  also context-basiert übersetzt: LINK→„bereits einen Web-Account, nutze /web resetPassword", RESET→„noch
+  keinen Web-Account, nutze /web link". **429** (Cooldown) liest `WebCommand` feature-lokal aus
+  `BackendException.statusCode()` (wie Reports 403/429); 5xx/Netzwerk → generische Meldung, nie ein Stacktrace.
+- **`feature.web` als ein Anstecken:** stabile id `"web"`, Konstruktor nimmt nur die zwei URL-Templates
+  (kein Transport-Seam) → die Registrierung kann keine generische Klasse berühren.
+- **Tests grün:** 15 Web-Tests (`WebMessagesTest` URL-Bau + Click-Link + Wording, `WebCommandTest`
+  richtiger Endpoint+UUID/Erfolg-Link/409-429-5xx gegen Recording-Fake-Backend, `WebFeatureTest`
+  Ein-Anstecken/Dedup), alle Bukkit-frei. Build/JAR grün (Ausnahme: 2 vorbestehende `DurationPickerTest`-
+  Fehler aus dem Permission-Slice, unabhängig von `feature.web` — auf sauberem HEAD identisch reproduzierbar).

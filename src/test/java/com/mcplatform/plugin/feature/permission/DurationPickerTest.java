@@ -1,9 +1,5 @@
 package com.mcplatform.plugin.feature.permission;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import com.mcplatform.plugin.platform.menu.ClickAction;
 import com.mcplatform.plugin.platform.menu.ClickContext;
 import com.mcplatform.plugin.platform.menu.Menu;
@@ -15,6 +11,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /** Proves the duration picker reports the right expiry: a Permanent button (→ null) plus day/year presets. */
 class DurationPickerTest {
@@ -33,7 +31,7 @@ class DurationPickerTest {
     void permanentButtonReportsNull() {
         List<Long> chosen = new ArrayList<>();
         DurationPicker picker = picker(chosen);
-        click(picker.menu(), 19, new RecordingMenuView(uuid, picker.menu())); // slot 19 = Permanent
+        click(picker.menu(), 24, new RecordingMenuView(uuid, picker.menu())); // slot 24 = Permanent
 
         assertEquals(1, chosen.size());
         assertNull(chosen.get(0), "Permanent → null expiresInSeconds");
@@ -45,8 +43,8 @@ class DurationPickerTest {
         DurationPicker picker = picker(chosen);
         RecordingMenuView view = new RecordingMenuView(uuid, picker.menu());
 
-        click(picker.menu(), 20, view); // 1 Tag
-        click(picker.menu(), 24, view); // 1 Jahr
+        click(picker.menu(), 19, view); // 1 Tag
+        click(picker.menu(), 23, view); // 1 Jahr
 
         assertEquals(86_400L, chosen.get(0));
         assertEquals(365L * 86_400L, chosen.get(1));
@@ -56,7 +54,7 @@ class DurationPickerTest {
     void hasHeaderAndCustomEntry() {
         DurationPicker picker = picker(new ArrayList<>());
         Menu menu = picker.menu();
-        assertEquals(true, menu.getItem(MenuLayout.HEADER) != null);
+        assertNotNull(menu.getItem(MenuLayout.HEADER));
         assertTrue(menu.getItem(25).isInteractive(), "custom-duration entry present");
     }
 }
