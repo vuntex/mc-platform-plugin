@@ -143,7 +143,7 @@ public final class RoleDetailMenu {
         Menu confirm = ConfirmDialog.of(MenuText.name("Rolle löschen?", Token.DANGER), object)
                 .confirmName(MenuText.name("Löschen", Token.DANGER))
                 .critical()
-                .onConfirm(c -> deleteRole(c))
+                .onConfirm(this::deleteRole)
                 .onBack(c -> c.view().open(menu))
                 .build();
         ctx.view().open(confirm);

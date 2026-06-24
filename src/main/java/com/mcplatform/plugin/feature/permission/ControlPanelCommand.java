@@ -2,7 +2,6 @@ package com.mcplatform.plugin.feature.permission;
 
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.platform.menu.MenuManager;
-import com.mcplatform.plugin.platform.menu.MenuView;
 import com.mcplatform.plugin.transport.BackendClient;
 
 import net.kyori.adventure.text.Component;
@@ -85,9 +84,8 @@ public final class ControlPanelCommand implements CommandExecutor {
     }
 
     private void openPanel(Player viewer, UUID target, String targetName) {
-        PlayerGrantsMenu panel = new PlayerGrantsMenu(target, targetName, viewer.getUniqueId(), menus,
+        ControlPanelMenu panel = new ControlPanelMenu(target, targetName, viewer.getUniqueId(), menus,
                 backend, scheduler, gate, iconResolver::resolve, input);
-        MenuView view = menus.open(viewer, panel.menu());
-        panel.load(view);
+        menus.open(viewer, panel.menu());
     }
 }

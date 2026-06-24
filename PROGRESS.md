@@ -720,24 +720,32 @@ Reiner Paper-Client zum fertigen, autoritativen Backend (`002-permission-rank-sy
   `IconExtractor.choose`) voll unit-getestet.
 - **Staff-Menüs (US1), alle STATIC:** `/ranks` → `RoleListMenu` (paginiert, Icon je Rolle via Resolver,
   interaktiver „Anlegen"-Header) → `RoleDetailMenu` (Umbenennen `UPDATE_ROLE`, Permissions `RolePermissionsMenu`
-  add/remove, Löschen via `ConfirmDialog.critical()` → `DELETE_ROLE` mit actor-Query) ; `/cp <Spieler>` →
-  `PlayerGrantsMenu` (online **und** offline, Name→UUID off-main; Grant/Revoke Rang+Permission, Re-Render aus
-  der `PlayerPermissionsResponse`). Kurze Texteingaben über `PermissionInput` (Chat-Fallback §4.6 — das
-  Framework hat keinen Anvil-Helper). **Kein `MenuLiveBus`-Abo → kein Beobachter-Leak per Konstruktion.**
+  add/remove, Löschen via `ConfirmDialog.critical()` → `DELETE_ROLE` mit actor-Query). **`/cp <Spieler>`** (online
+  **und** offline, Name→UUID off-main) öffnet ein **3-stufiges Control Panel**: `ControlPanelMenu` (Shell, Platz
+  für künftige Optionen) → `PlayerRanksMenu` (Ränge **direkt**: Grant via Picker, der bereits gehaltene Ränge
+  ausblendet, + Revoke; dazu Link „Permissions") → `PlayerPermissionsMenu` (Einzel-Permissions, paginiert,
+  Grant/Revoke). Re-Render jeweils aus der `PlayerPermissionsResponse`. Kurze Texteingaben über `PermissionInput`
+  (Chat-Fallback §4.6 — das Framework hat keinen Anvil-Helper). **Kein `MenuLiveBus`-Abo → kein Beobachter-Leak
+  per Konstruktion.**
 - **Phase R0 (freigegeben, additiv): Icon-Notausgang in der Render-Schicht.** `IconSpec` +`baseItem` (`ItemStack`,
   nullable) +`ofItem(...)`; `MenuRenderer.toStack()` klont `baseItem` und legt Name/Lore darüber. Nur so gelangt
   der vom Feature gebaute `ItemStack` ins Menü. Rückwärtskompatibel — alle bestehenden Menü-Tests bleiben grün.
 - **Keine der sechs geschützten Generika geändert** (FeatureCache/EventBus/BackendClient/MenuBuilder/
   PluginFeature/Scheduler). Bestands-Edits nur: 1 `.register(new PermissionFeature(menus))`, additive `plugin.yml`
   (rank/ranks/cp), und der freigegebene R0 an `IconSpec`/`MenuRenderer`.
-- **⚠️ Offener Muster-Leck-Checkpoint (gemeldet, NICHT eigenmächtig geändert):** `HttpBackendClient.applyMethod`
-  sendet bei `DELETE` **keinen Body** (`builder.DELETE()`). `REVOKE_PERMISSION` ist `DELETE` **mit** Body
-  (`RevokePermissionRequest`) — der Feature-Code ruft contract-korrekt, aber der Body wird mit dem aktuellen
-  generischen Client nicht übertragen. Fix wäre einzeilig (`builder.method("DELETE", publisher)` wenn Body
-  vorhanden) an einer **generischen** Transport-Klasse → bewusst offen gelassen, Entscheidung des Auftraggebers.
-  `DELETE_ROLE`/`REVOKE_ROLE` (actor als Query, kein Body) funktionieren.
-- **Tests grün:** 32 Permission-Tests (`DisplayIconFormatTest`, `PermissionCacheTest`, `PermissionGateTest`
+- **Muster-Leck behoben (freigegeben, additiv):** `HttpBackendClient.applyMethod` sendet bei `DELETE` jetzt
+  einen Body, wenn einer vorhanden ist (`builder.method("DELETE", publisher)`), sonst weiter bodyless `.DELETE()`.
+  Damit funktioniert `REVOKE_PERMISSION` (`DELETE` **mit** `RevokePermissionRequest`) end-to-end; rückwärtskompatibel
+  (bodyless DELETEs unverändert). Verifiziert in `HttpBackendClientTest` (DELETE-mit-Body überträgt den Body,
+  DELETE-ohne-Body bleibt leer). Einzige generische Berührung in der Transport-Schicht, da der Contract `DELETE`+Body
+  verlangt und es feature-lokal nicht umgehbar war.
+- **Ablaufdatum bei Vergaben:** `GRANT_ROLE`/`GRANT_PERMISSION` tragen `expiresInSeconds`; die Dauer wird über einen
+  **`DurationPicker`-Menü** gewählt — klarer **Permanent**-Button + Presets (1 Tag, 7/30/90 Tage, 1 Jahr) +
+  „Eigene Dauer…" (Chat, `30d`/`1d12h` **oder** `permanent`/`-1`). Rang-Vergabe ist damit voll klickbar.
+  `DurationInput` (pure, getestet) parst die Custom-Eingabe; `permanent`/`perm`/`-`/`-1`/leer → permanent.
+- **Tests grün:** 41 Permission-Tests (`DisplayIconFormatTest`, `PermissionCacheTest`, `PermissionGateTest`
   inkl. Wildcards + Cold-Cache-Deny, `PermissionFormatTest`, `PermissionLiveUpdaterTest`,
-  `PermissionWarmupListenerTest`, `IconChoiceTest`, `RoleListMenuTest`, `PlayerGrantsMenuTest`),
-  `./gradlew build` grün, JAR erzeugt. (Reine Logik voll getestet; ItemStack-Rendering + PreLogin-`disallow`-Glue
+  `PermissionWarmupListenerTest`, `IconChoiceTest`, `DurationInputTest`, `DurationPickerTest`, `RoleListMenuTest`,
+  `PlayerRanksMenuTest` inkl. Picker-Ausschluss gehaltener Ränge, `PlayerPermissionsMenuTest`) + 2 Transport-Tests
+  (DELETE-mit/ohne Body), `./gradlew build` grün, JAR erzeugt. (Reine Logik voll getestet; ItemStack-Rendering + PreLogin-`disallow`-Glue
   manuell verifiziert — kein MockBukkit im Projekt.)
