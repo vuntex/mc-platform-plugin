@@ -20,8 +20,8 @@ class WebFeatureTest {
     private final Logger logger = Logger.getLogger("test");
 
     private static WebFeature newFeature() {
-        return new WebFeature("https://web.example.com/set-password?token={token}",
-                "https://web.example.com/reset-password?token={token}");
+        return new WebFeature("http://localhost:3000/set-password?token={token}",
+                "http://localhost:3000/reset-password?token={token}");
     }
 
     @Test
