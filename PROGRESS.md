@@ -692,3 +692,89 @@ generische Klasse geändert** (verifiziert per Diff). Spec/Plan/Tasks unter `spe
   `BackendException` bleibt unverändert.
 - **Tests grün:** 17 Report-Tests (`ReportFormatTest`, `ChatRingBufferTest`, `ReportReasonPromptTest`,
   `ReportLiveUpdaterTest`, `ReportInboxMenuTest`), `./gradlew build` grün, JAR erzeugt.
+
+## Permission/Rank-System — Plugin-Slice (viertes Feature, `feature.permission`)
+
+Reiner Paper-Client zum fertigen, autoritativen Backend (`002-permission-rank-system`). Alles additiv in
+`feature.permission` + **einer** `FeatureRegistry`-Zeile. Spec/Plan/Tasks: `specs/002-permission-rank-client/`.
+
+- **Live-Cache (US2):** `PermissionCache` über die **generische** `FeatureCache<UUID, PlayerPermissionsView>`
+  (unverändert), version-aware mit `timestampEpochMilli`. **Kaltstart = PreLogin-Warmup, fail-closed:**
+  `PermissionWarmupListener` (`AsyncPlayerPreLoginEvent`, `HIGHEST`, nur wenn Login noch `ALLOWED`) lädt
+  blockierend `GET …/effective` (async PreLogin-Thread, Main-Thread nie blockiert) und schreibt den Cache
+  **bevor** der Spieler die Welt betritt; Backend down/leer → `disallow(KICK_OTHER)` (harter Kick, exakt wie
+  der Session-Gate). `PermissionQuitListener`: Quit → evict. Damit hat ein In-World-Spieler **garantiert** einen
+  warmen Cache. **Laufzeit-Änderungen** sind unabhängig: `PermissionLiveUpdater` abonniert `mc:permission:changed`
+  (`PermissionChangedEventCodec.INSTANCE`, schon in `PlatformProtocol.create()`): online → **nur die betroffene
+  UUID** neu laden, offline → ignorieren; jeder changeType (auch unbekannt) → reload. Beide Mechanismen koexistieren.
+- **Cache-basiertes Gate (US3):** `PermissionGate.has(uuid, node)` liest den Cache. Eintrag + Node (inkl.
+  Wildcards `*` / Ancestor-`x.y.*` / exakt via `grants(...)`) → erlauben; Eintrag ohne Node → sperren;
+  **Cold-Cache → strict-deny + Warnlog** („permission check on cold cache … warmup gap?") — kein optimistisches
+  Durchwinken mehr, da der PreLogin-Warmup einen warmen Cache garantiert; ein kalter Cache ist jetzt ein
+  Bug-Indikator. Backend (`403`) bleibt die Wahrheit. Feingranulare Nodes `mcplatform.permission.roles.manage`
+  / `…grants.manage` (Cache-geprüft; **kein** blockierendes `plugin.yml`-Permission auf den Commands).
+- **display_icon — zwei Richtungen, ein Format (`DisplayIconFormat`):** `IconResolver` (String→`ItemStack`,
+  `material:`/`head-texture:`/`head-player:` via Paper-`PlayerProfile`, **kein NMS**; null/unbekannt/ungültig →
+  sichtbares Fallback `BARRIER`); `IconExtractor` + `/rank toDisplayIcon` (in-Hand-Item → `material:`/
+  `head-texture:<base64>`, click-to-copy; **kein** Backend-Call). Reine Logik (`DisplayIconFormat.parse`,
+  `IconExtractor.choose`) voll unit-getestet.
+- **Staff-Menüs (US1), alle STATIC:** `/ranks` → `RoleListMenu` (paginiert, Icon je Rolle via Resolver,
+  interaktiver „Anlegen"-Header) → `RoleDetailMenu` (Umbenennen `UPDATE_ROLE`, Permissions `RolePermissionsMenu`
+  add/remove, Löschen via `ConfirmDialog.critical()` → `DELETE_ROLE` mit actor-Query). **`/cp <Spieler>`** (online
+  **und** offline, Name→UUID off-main) öffnet ein **3-stufiges Control Panel**: `ControlPanelMenu` (Shell, Platz
+  für künftige Optionen) → `PlayerRanksMenu` (Ränge **direkt**: Grant via Picker, der bereits gehaltene Ränge
+  ausblendet, + Revoke; dazu Link „Permissions") → `PlayerPermissionsMenu` (Einzel-Permissions, paginiert,
+  Grant/Revoke). Re-Render jeweils aus der `PlayerPermissionsResponse`. Kurze Texteingaben über `PermissionInput`
+  (Chat-Fallback §4.6 — das Framework hat keinen Anvil-Helper). **Kein `MenuLiveBus`-Abo → kein Beobachter-Leak
+  per Konstruktion.**
+- **Phase R0 (freigegeben, additiv): Icon-Notausgang in der Render-Schicht.** `IconSpec` +`baseItem` (`ItemStack`,
+  nullable) +`ofItem(...)`; `MenuRenderer.toStack()` klont `baseItem` und legt Name/Lore darüber. Nur so gelangt
+  der vom Feature gebaute `ItemStack` ins Menü. Rückwärtskompatibel — alle bestehenden Menü-Tests bleiben grün.
+- **Keine der sechs geschützten Generika geändert** (FeatureCache/EventBus/BackendClient/MenuBuilder/
+  PluginFeature/Scheduler). Bestands-Edits nur: 1 `.register(new PermissionFeature(menus))`, additive `plugin.yml`
+  (rank/ranks/cp), und der freigegebene R0 an `IconSpec`/`MenuRenderer`.
+- **Muster-Leck behoben (freigegeben, additiv):** `HttpBackendClient.applyMethod` sendet bei `DELETE` jetzt
+  einen Body, wenn einer vorhanden ist (`builder.method("DELETE", publisher)`), sonst weiter bodyless `.DELETE()`.
+  Damit funktioniert `REVOKE_PERMISSION` (`DELETE` **mit** `RevokePermissionRequest`) end-to-end; rückwärtskompatibel
+  (bodyless DELETEs unverändert). Verifiziert in `HttpBackendClientTest` (DELETE-mit-Body überträgt den Body,
+  DELETE-ohne-Body bleibt leer). Einzige generische Berührung in der Transport-Schicht, da der Contract `DELETE`+Body
+  verlangt und es feature-lokal nicht umgehbar war.
+- **Ablaufdatum bei Vergaben:** `GRANT_ROLE`/`GRANT_PERMISSION` tragen `expiresInSeconds`; die Dauer wird über einen
+  **`DurationPicker`-Menü** gewählt — klarer **Permanent**-Button + Presets (1 Tag, 7/30/90 Tage, 1 Jahr) +
+  „Eigene Dauer…" (Chat, `30d`/`1d12h` **oder** `permanent`/`-1`). Rang-Vergabe ist damit voll klickbar.
+  `DurationInput` (pure, getestet) parst die Custom-Eingabe; `permanent`/`perm`/`-`/`-1`/leer → permanent.
+- **Tests grün:** 41 Permission-Tests (`DisplayIconFormatTest`, `PermissionCacheTest`, `PermissionGateTest`
+  inkl. Wildcards + Cold-Cache-Deny, `PermissionFormatTest`, `PermissionLiveUpdaterTest`,
+  `PermissionWarmupListenerTest`, `IconChoiceTest`, `DurationInputTest`, `DurationPickerTest`, `RoleListMenuTest`,
+  `PlayerRanksMenuTest` inkl. Picker-Ausschluss gehaltener Ränge, `PlayerPermissionsMenuTest`) + 2 Transport-Tests
+  (DELETE-mit/ohne Body), `./gradlew build` grün, JAR erzeugt. (Reine Logik voll getestet; ItemStack-Rendering + PreLogin-`disallow`-Glue
+  manuell verifiziert — kein MockBukkit im Projekt.)
+
+## Web-Auth-Bridge — Plugin-Slice (fünftes Feature, `feature.web`)
+
+Reiner Backend-Client gegen den fertigen Web-Auth-Contract (`com.mcplatform.protocol.webauth`,
+Backend-Slice `003-web-auth-bridge`). Angesteckt mit **einer** `.register(new WebFeature(...))`-Zeile +
+additivem `plugin.yml`-Eintrag (`web`) + `config.yml`-Sektion (`web.link-url`/`web.reset-url`) — **keine
+generische Klasse geändert** (kein Cache, kein `EventBus`, kein Listener: die Bridge hat bewusst keinen
+Live-/Pub-Sub-Pfad, R7).
+
+- **Commands (`/web`, online-only):** `/web link` → `WebAuthEndpoints.REQUEST_LINK`, `/web resetPassword`
+  → `REQUEST_RESET`, beide **POST** mit der UUID des Senders als einzige Pfadvariable (`Void`-Body) über
+  den generischen `BackendClient`. Die In-Game-Session beweist die Identität (UUID = Account-Besitz) →
+  keine Permission, keine Namensauflösung. `/web` ohne/mit unbekanntem Argument → kurze Hilfe; Konsole →
+  Hinweis (kein Crash). REST läuft async, die Chat-Antwort hüpft per `scheduler.runSync` auf den Main-Thread.
+- **Klickbarer Link (`WebMessages`, reine Adventure-Components, keine §-Codes, FR-025):** aus
+  `TokenResponse.token` baut `buildUrl(template, token)` die Frontend-URL (Token in das **konfigurierte**
+  Template `{token}` substituiert — keine hardcodierte URL) und liefert sie als `ClickEvent.openUrl`-
+  Komponente mit Hover; LINK = Account-Anlegen-Kontext, RESET = Passwort-zurücksetzen-Kontext.
+- **Fehler ohne Muster-Leck:** Beide Ablehnungen mappt das Backend auf **409** (`web_account_exists` vs.
+  `web_account_missing`) — pro Command eindeutig (jeder Fehler tritt nur an seinem eigenen Endpoint auf),
+  also context-basiert übersetzt: LINK→„bereits einen Web-Account, nutze /web resetPassword", RESET→„noch
+  keinen Web-Account, nutze /web link". **429** (Cooldown) liest `WebCommand` feature-lokal aus
+  `BackendException.statusCode()` (wie Reports 403/429); 5xx/Netzwerk → generische Meldung, nie ein Stacktrace.
+- **`feature.web` als ein Anstecken:** stabile id `"web"`, Konstruktor nimmt nur die zwei URL-Templates
+  (kein Transport-Seam) → die Registrierung kann keine generische Klasse berühren.
+- **Tests grün:** 15 Web-Tests (`WebMessagesTest` URL-Bau + Click-Link + Wording, `WebCommandTest`
+  richtiger Endpoint+UUID/Erfolg-Link/409-429-5xx gegen Recording-Fake-Backend, `WebFeatureTest`
+  Ein-Anstecken/Dedup), alle Bukkit-frei. Build/JAR grün (Ausnahme: 2 vorbestehende `DurationPickerTest`-
+  Fehler aus dem Permission-Slice, unabhängig von `feature.web` — auf sauberem HEAD identisch reproduzierbar).

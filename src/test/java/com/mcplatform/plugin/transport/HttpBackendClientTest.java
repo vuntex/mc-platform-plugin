@@ -144,6 +144,34 @@ class HttpBackendClientTest {
     }
 
     @Test
+    void deleteWithBodySendsTheRequestBody() throws Exception {
+        // REVOKE_PERMISSION is DELETE with a body — the body must actually reach the server.
+        responseBody = json.toJson(new com.mcplatform.protocol.permission.PlayerPermissionsResponse(
+                PLAYER, java.util.List.of(), java.util.List.of(), java.util.List.of(), null));
+
+        Object result = await(client().call(
+                com.mcplatform.protocol.permission.PermissionEndpoints.REVOKE_PERMISSION,
+                new com.mcplatform.protocol.permission.RevokePermissionRequest("mcplatform.fly", null, PLAYER),
+                PLAYER.toString()));
+
+        assertEquals("DELETE", seenMethod.get());
+        assertEquals("/api/permission/players/" + PLAYER + "/permissions", seenPath.get());
+        assertTrue(seenBody.get().contains("mcplatform.fly"), seenBody.get());
+        assertTrue(result != null);
+    }
+
+    @Test
+    void deleteWithoutBodySendsNoBody() throws Exception {
+        responseStatus = 204;
+
+        await(client().call(com.mcplatform.protocol.permission.PermissionEndpoints.DELETE_ROLE, null,
+                java.util.Map.of("actor", PLAYER.toString()), "7"));
+
+        assertEquals("DELETE", seenMethod.get());
+        assertEquals("", seenBody.get());
+    }
+
+    @Test
     void status422MapsToInsufficientFunds() {
         responseStatus = 422;
         responseBody = "{\"error\":\"insufficient_funds\"}";

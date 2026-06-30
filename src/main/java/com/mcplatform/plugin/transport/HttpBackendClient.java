@@ -117,7 +117,7 @@ public final class HttpBackendClient implements BackendClient {
             builder.header("Content-Type", "application/json");
             publisher = BodyPublishers.ofString(json.toJson(body), StandardCharsets.UTF_8);
         }
-        applyMethod(builder, endpoint.method(), publisher);
+        applyMethod(builder, endpoint.method(), publisher, body != null);
 
         HttpResponse<String> response;
         try {
@@ -165,10 +165,19 @@ public final class HttpBackendClient implements BackendClient {
         return sb.toString();
     }
 
-    private static void applyMethod(HttpRequest.Builder builder, HttpMethod method, BodyPublisher publisher) {
+    private static void applyMethod(HttpRequest.Builder builder, HttpMethod method, BodyPublisher publisher,
+                                    boolean hasBody) {
         switch (method) {
             case GET -> builder.GET();
-            case DELETE -> builder.DELETE();
+            // DELETE may carry a body (e.g. REVOKE_PERMISSION's RevokePermissionRequest): the convenience
+            // .DELETE() is bodyless, so send the publisher explicitly when there is one.
+            case DELETE -> {
+                if (hasBody) {
+                    builder.method("DELETE", publisher);
+                } else {
+                    builder.DELETE();
+                }
+            }
             case POST -> builder.POST(publisher);
             case PUT -> builder.PUT(publisher);
             case PATCH -> builder.method("PATCH", publisher);

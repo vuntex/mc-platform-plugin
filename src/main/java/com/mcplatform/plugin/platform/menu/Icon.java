@@ -29,6 +29,7 @@ public enum Icon {
     MANAGE("WRITABLE_BOOK"),
     HISTORY("BOOK"),
     VALUE("OAK_SIGN"),
+    DURATION("CLOCK"),
     /** Danger / punishment — render with attributes hidden. */
     DANGER("IRON_SWORD", true),
     ADD("ANVIL"),
