@@ -83,7 +83,8 @@ class TransactionHistoryMenuTest {
     }
 
     private EconomyEventEntry entry(long seq, String type, long amount) {
-        return new EconomyEventEntry(seq, "COINS", type, amount, 1_000L, UUID.randomUUID(), "PLUGIN:test", null, 0L);
+        return new EconomyEventEntry(seq, "COINS", type, amount, 1_000L, UUID.randomUUID(), "PLUGIN:test",
+                null, null, 0L);
     }
 
     private EconomyHistoryResponse page(int count, long startSeq, String type, Long nextCursor) {
@@ -156,8 +157,12 @@ class TransactionHistoryMenuTest {
         // Initial load is the ALL filter → no type param.
         assertNull(backend.queries.get(0).get("type"));
 
-        // Cycle once (ALL → CREDITED) → a fresh read scoped to that type.
-        menu.cycleFilter(new ClickContext(viewer, ClickAction.LEFT, TransactionHistoryMenu.FILTER_SLOT, view));
+        // Left-click cycles forward (ALL → CREDITED) → a fresh read scoped to that type.
+        menu.menu().route(new ClickContext(viewer, ClickAction.LEFT, TransactionHistoryMenu.FILTER_SLOT, view));
         assertEquals("CREDITED", backend.queries.get(backend.queries.size() - 1).get("type"));
+
+        // Right-click cycles backward (CREDITED → ALL again) → no type param.
+        menu.menu().route(new ClickContext(viewer, ClickAction.RIGHT, TransactionHistoryMenu.FILTER_SLOT, view));
+        assertNull(backend.queries.get(backend.queries.size() - 1).get("type"));
     }
 }

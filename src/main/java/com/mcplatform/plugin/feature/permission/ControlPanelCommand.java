@@ -1,7 +1,9 @@
 package com.mcplatform.plugin.feature.permission;
 
+import com.mcplatform.plugin.platform.ActionBars;
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.platform.menu.MenuManager;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.transport.BackendClient;
 
 import net.kyori.adventure.text.Component;
@@ -54,7 +56,7 @@ public final class ControlPanelCommand implements CommandExecutor {
             return true;
         }
         if (!gate.has(player.getUniqueId(), PermissionNodes.GRANTS_MANAGE)) {
-            player.sendMessage(Component.text("Dazu fehlt dir die Berechtigung.", NamedTextColor.RED));
+            ActionBars.error(player, Messages.noPermission());
             return true;
         }
 
@@ -73,8 +75,7 @@ public final class ControlPanelCommand implements CommandExecutor {
             String resolvedName = offline.getName() != null ? offline.getName() : name;
             scheduler.runSync(() -> {
                 if (!known || uuid == null) {
-                    player.sendMessage(Component.text("Spieler \"" + name + "\" wurde nicht gefunden.",
-                            NamedTextColor.RED));
+                    player.sendMessage(Messages.playerNotFound(name));
                     return;
                 }
                 openPanel(player, uuid, resolvedName);

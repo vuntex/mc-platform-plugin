@@ -28,4 +28,10 @@ public final class PermissionReadPort {
                 .map(RoleDisplay::displayName)
                 .filter(name -> !name.isBlank());
     }
+
+    /** The player's full chosen role display (name + color + prefix/suffix) for the chat format. */
+    public Optional<RoleDisplay> currentDisplay(UUID player) {
+        return cache.get(player).map(PlayerPermissionsView::display);
+    }
 }
+

@@ -1,5 +1,8 @@
 package com.mcplatform.plugin.feature.permission;
 
+import com.mcplatform.plugin.platform.ActionBars;
+import com.mcplatform.plugin.platform.text.Messages;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -39,7 +42,7 @@ public final class RankCommand implements CommandExecutor {
             return true;
         }
         if (!gate.has(player.getUniqueId(), PermissionNodes.ROLES_MANAGE)) {
-            player.sendMessage(Component.text("Dazu fehlt dir die Berechtigung.", NamedTextColor.RED));
+            ActionBars.error(player, Messages.noPermission());
             return true;
         }
         ItemStack hand = player.getInventory().getItemInMainHand();

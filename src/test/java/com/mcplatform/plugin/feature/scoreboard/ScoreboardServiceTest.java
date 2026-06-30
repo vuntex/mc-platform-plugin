@@ -78,7 +78,7 @@ class ScoreboardServiceTest {
         service.show(new PlayerContext(PLAYER, Optional.empty()), handle);
 
         assertEquals(Component.text("Admin", NamedTextColor.WHITE), handle.current.get(Profiles.RANK));
-        assertEquals(Component.text("250", NamedTextColor.YELLOW), handle.current.get(Profiles.COINS)); // via load
+        assertEquals(Component.text("250", NamedTextColor.WHITE), handle.current.get(Profiles.COINS)); // via load
         assertEquals(Component.text("Rank", NamedTextColor.AQUA, TextDecoration.BOLD),
                 handle.current.get(Profiles.RANK_LABEL)); // static label
         assertEquals(1, service.activeBoards());
@@ -91,7 +91,7 @@ class ScoreboardServiceTest {
         coinsCache.put(PLAYER, 999L, 2L);     // a balance event updated economy's cache
         liveBus.notifyChange(PLAYER);
 
-        assertEquals(Component.text("999", NamedTextColor.YELLOW), handle.current.get(Profiles.COINS));
+        assertEquals(Component.text("999", NamedTextColor.WHITE), handle.current.get(Profiles.COINS));
         assertEquals(Component.text("Rank", NamedTextColor.AQUA, TextDecoration.BOLD),
                 handle.current.get(Profiles.RANK_LABEL)); // static label unchanged
     }

@@ -1,8 +1,10 @@
 package com.mcplatform.plugin.feature.permission;
 
+import com.mcplatform.plugin.platform.ActionBars;
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.platform.menu.MenuView;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.transport.BackendClient;
 
 import net.kyori.adventure.text.Component;
@@ -46,7 +48,7 @@ public final class RanksCommand implements CommandExecutor {
             return true;
         }
         if (!gate.has(player.getUniqueId(), PermissionNodes.ROLES_MANAGE)) {
-            player.sendMessage(Component.text("Dazu fehlt dir die Berechtigung.", NamedTextColor.RED));
+            ActionBars.error(player, Messages.noPermission());
             return true;
         }
         RoleListMenu list = new RoleListMenu(player.getUniqueId(), menus, backend, scheduler, gate,

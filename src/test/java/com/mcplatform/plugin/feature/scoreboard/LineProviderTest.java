@@ -38,7 +38,7 @@ class LineProviderTest {
         EconomyLineProvider provider = new EconomyLineProvider(
                 new EconomyReadPort(new FakeBackendClient(), cache, "COINS"));
 
-        assertEquals(Component.text("250", NamedTextColor.YELLOW), provider.resolve(ctx()));
+        assertEquals(Component.text("250", NamedTextColor.WHITE), provider.resolve(ctx()));
     }
 
     @Test
@@ -46,7 +46,7 @@ class LineProviderTest {
         EconomyLineProvider provider = new EconomyLineProvider(
                 new EconomyReadPort(new FakeBackendClient(), new FeatureCache<>(), "COINS"));
 
-        assertEquals(Component.text("…", NamedTextColor.YELLOW), provider.resolve(ctx()));
+        assertEquals(Component.text("…", NamedTextColor.WHITE), provider.resolve(ctx()));
     }
 
     @Test

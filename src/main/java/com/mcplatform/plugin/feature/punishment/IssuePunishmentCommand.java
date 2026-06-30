@@ -1,6 +1,8 @@
 package com.mcplatform.plugin.feature.punishment;
 
+import com.mcplatform.plugin.platform.ActionBars;
 import com.mcplatform.plugin.platform.PlatformScheduler;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.protocol.punishment.IssueRequest;
 import com.mcplatform.protocol.punishment.PunishmentEndpoints;
@@ -42,7 +44,7 @@ public final class IssuePunishmentCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!sender.hasPermission(permission)) {
-            sender.sendMessage("§cKeine Berechtigung.");
+            ActionBars.deny(sender, Messages.noPermission());
             return true;
         }
         int minArgs = needsDuration ? 2 : 1;

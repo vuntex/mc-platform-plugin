@@ -8,6 +8,7 @@ import com.mcplatform.plugin.platform.menu.Menu;
 import com.mcplatform.plugin.platform.menu.MenuBuilder;
 import com.mcplatform.plugin.platform.menu.MenuItem;
 import com.mcplatform.plugin.platform.menu.MenuText;
+import com.mcplatform.plugin.platform.text.ChatDesign;
 import com.mcplatform.plugin.platform.menu.Token;
 
 import java.util.Optional;
@@ -58,8 +59,9 @@ public final class BalanceMenu {
                     MenuText.name("Lade…", Token.BODY),
                     Lore.builder().describe("Kontostand wird geladen.").build()));
         }
+        String value = ChatDesign.number(balance.get()) + " " + EconomyFeature.currencyDisplay(currency);
         return MenuItem.display(IconSpec.of(Icon.VALUE,
-                MenuText.name(balance.get() + " " + currency, Token.ENTITY),
-                Lore.builder().describe("Dein aktueller Kontostand.").value("Stand:", balance.get() + " " + currency).build()));
+                MenuText.name(value, Token.ENTITY),
+                Lore.builder().describe("Dein aktueller Kontostand.").value("Stand:", value).build()));
     }
 }

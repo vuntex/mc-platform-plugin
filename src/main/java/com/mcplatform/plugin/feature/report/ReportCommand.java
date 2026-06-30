@@ -1,6 +1,7 @@
 package com.mcplatform.plugin.feature.report;
 
 import com.mcplatform.plugin.platform.menu.MenuManager;
+import com.mcplatform.plugin.platform.text.Messages;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -37,7 +38,7 @@ public final class ReportCommand implements CommandExecutor {
             return true;
         }
         if (args.length != 1) {
-            reporter.sendMessage(Component.text("Benutzung: /report <spieler>", NamedTextColor.GRAY));
+            reporter.sendMessage(Messages.usage("/report <spieler>"));
             return true;
         }
 
@@ -49,8 +50,7 @@ public final class ReportCommand implements CommandExecutor {
 
         Player target = Bukkit.getPlayerExact(args[0]);
         if (target == null) {
-            reporter.sendMessage(Component.text(
-                    "Spieler nicht gefunden oder offline.", NamedTextColor.RED));
+            reporter.sendMessage(Messages.playerNotOnline(args[0]));
             return true;
         }
         if (target.getUniqueId().equals(reporter.getUniqueId())) {

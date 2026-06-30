@@ -1,23 +1,21 @@
 package com.mcplatform.plugin.feature.web;
 
+import com.mcplatform.plugin.platform.text.ChatDesign;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 /**
  * Player-facing chat content for {@code /web}, built as pure Adventure {@link Component}s (no Bukkit,
- * no § codes — FR-025), so the wording and the clickable link are unit-testable. The link itself is the
- * secret: the one-time token is substituted into the admin-configured frontend URL template and shipped
- * as an {@link ClickEvent#openUrl(String) open_url} component the player never has to type.
+ * no § codes — FR-025), so the wording and the clickable link are unit-testable. Styled with the central
+ * {@link ChatDesign} scheme (see {@code CHAT_DESIGN.md}): a bold {@code WEB>} prefix, gray body, aqua
+ * links/commands, red errors — consistent with the rest of the plugin. The link itself is the secret:
+ * the one-time token is substituted into the admin-configured frontend URL template and shipped as an
+ * {@link ClickEvent#openUrl(String) open_url} component the player never has to type.
  */
 final class WebMessages {
-
-    private static final TextColor ACCENT = TextColor.color(0x4FC3F7); // web blue
-    private static final TextColor LABEL = TextColor.color(0xAAAAAA);
-    private static final TextColor LINK = TextColor.color(0x55FFFF);
-    private static final TextColor ERROR = TextColor.color(0xFF5555);
 
     /** Placeholder the configured frontend URL templates must contain. */
     static final String TOKEN_PLACEHOLDER = "{token}";
@@ -33,74 +31,88 @@ final class WebMessages {
     /** Success notice for {@code /web link}: create-account context, clickable link to set a password. */
     static Component linkSuccess(String url) {
         return success(
-                "Klicke hier, um deinen Web-Account zu erstellen",
-                "Du legst dort dein Passwort fürs Webinterface fest.",
+                "Klicke auf den Button, um deinen Web-Account zu erstellen.",
+                "Dort legst du dein Passwort fürs Webinterface fest.",
+                "Web-Account erstellen",
                 url);
     }
 
     /** Success notice for {@code /web resetPassword}: reset context, clickable link to set a new password. */
     static Component resetSuccess(String url) {
         return success(
-                "Klicke hier, um dein Passwort zurückzusetzen",
-                "Du vergibst dort ein neues Passwort fürs Webinterface.",
+                "Klicke auf den Button, um dein Passwort zurückzusetzen.",
+                "Dort vergibst du ein neues Passwort fürs Webinterface.",
+                "Passwort zurücksetzen",
                 url);
     }
 
-    private static Component success(String linkText, String hint, String url) {
-        Component link = Component.text("» " + linkText, LINK)
-                .decorate(TextDecoration.UNDERLINED)
+    private static Component success(String intro, String hint, String buttonLabel, String url) {
+        Component button = Component.text(" [ " + buttonLabel + " » ] ", ChatDesign.ACCENT)
+                .decoration(TextDecoration.BOLD, true)
                 .clickEvent(ClickEvent.openUrl(url))
-                .hoverEvent(HoverEvent.showText(Component.text(url, ACCENT)));
-        return Component.text("Web-Account", ACCENT).decorate(TextDecoration.BOLD)
-                .append(Component.text(" » ", LABEL).decoration(TextDecoration.BOLD, false))
-                .append(Component.text(hint, LABEL))
+                .hoverEvent(HoverEvent.showText(ChatDesign.muted("Öffnen: " + url)));
+        return Component.empty()
+                .append(prefix()).append(ChatDesign.text(intro))
                 .append(Component.newline())
-                .append(link)
+                .append(prefix()).append(ChatDesign.muted(hint))
                 .append(Component.newline())
-                .append(Component.text("Der Link ist nur kurz gültig.", LABEL));
+                .append(button)
+                .append(Component.newline())
+                .append(prefix()).append(ChatDesign.muted("Der Link ist nur kurz gültig."));
     }
 
     /** {@code /web link} but the player already owns a web account (backend 409). */
     static Component alreadyExists() {
-        return error("Du hast bereits einen Web-Account. Nutze ")
-                .append(Component.text("/web resetPassword", LINK))
-                .append(Component.text(", um dein Passwort zurückzusetzen.", ERROR));
+        return prefix()
+                .append(ChatDesign.error("Du hast bereits einen Web-Account. Nutze "))
+                .append(command("/web resetPassword"))
+                .append(ChatDesign.error(", um dein Passwort zurückzusetzen."));
     }
 
     /** {@code /web resetPassword} but the player has no web account yet (backend 409). */
     static Component noAccount() {
-        return error("Du hast noch keinen Web-Account. Nutze ")
-                .append(Component.text("/web link", LINK))
-                .append(Component.text(", um einen zu erstellen.", ERROR));
+        return prefix()
+                .append(ChatDesign.error("Du hast noch keinen Web-Account. Nutze "))
+                .append(command("/web link"))
+                .append(ChatDesign.error(", um einen zu erstellen."));
     }
 
     /** Backend cooldown (429): a token was requested very recently. */
     static Component cooldown() {
-        return error("Bitte warte einen Moment, bevor du es erneut versuchst.");
+        return prefix().append(ChatDesign.error("Bitte warte einen Moment, bevor du es erneut versuchst."));
     }
 
     /** Network / 5xx / anything else — never a stacktrace to the player. */
     static Component genericError() {
-        return error("Aktion fehlgeschlagen. Bitte versuche es später erneut.");
+        return prefix().append(ChatDesign.error("Aktion fehlgeschlagen. Bitte versuche es später erneut."));
     }
 
     /** Shown for {@code /web} without (or with an unknown) subcommand. */
     static Component help() {
-        return Component.text("Web-Account", ACCENT).decorate(TextDecoration.BOLD)
+        return Component.empty()
+                .append(prefix()).append(ChatDesign.text("Verwalte deinen Web-Account:"))
                 .append(Component.newline())
-                .append(Component.text("  /web link", LINK))
-                .append(Component.text(" – erstellt deinen Web-Account.", LABEL))
+                .append(ChatDesign.muted("  • ")).append(command("/web link"))
+                .append(ChatDesign.text(" – erstellt deinen Web-Account."))
                 .append(Component.newline())
-                .append(Component.text("  /web resetPassword", LINK))
-                .append(Component.text(" – setzt dein Passwort zurück.", LABEL));
+                .append(ChatDesign.muted("  • ")).append(command("/web resetPassword"))
+                .append(ChatDesign.text(" – setzt dein Passwort zurück."));
     }
 
     /** {@code /web} is player-only (needs a UUID); the console gets a hint instead of a crash. */
     static Component consoleOnly() {
-        return error("Nur Spieler können /web nutzen (es braucht deine Account-Identität).");
+        return prefix().append(ChatDesign.error("Nur Spieler können /web nutzen (es braucht deine Account-Identität)."));
     }
 
-    private static Component error(String message) {
-        return Component.text(message, ERROR);
+    /** The bold {@code WEB>} feature prefix (aqua) shared by every line. */
+    private static Component prefix() {
+        return ChatDesign.prefix("WEB", ChatDesign.ACCENT);
+    }
+
+    /** A clickable command reference: aqua, suggests the command on click. */
+    private static Component command(String cmd) {
+        return Component.text(cmd, ChatDesign.ACCENT)
+                .clickEvent(ClickEvent.suggestCommand(cmd))
+                .hoverEvent(HoverEvent.showText(ChatDesign.muted("Klicken zum Einfügen")));
     }
 }

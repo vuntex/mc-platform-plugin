@@ -1,7 +1,7 @@
 package com.mcplatform.plugin.feature.economy;
 
 import com.mcplatform.plugin.platform.PlatformScheduler;
-import com.mcplatform.plugin.platform.menu.ClickContext;
+import com.mcplatform.plugin.platform.menu.CycleControl;
 import com.mcplatform.plugin.platform.menu.Feedback;
 import com.mcplatform.plugin.platform.menu.Icon;
 import com.mcplatform.plugin.platform.menu.IconSpec;
@@ -17,6 +17,9 @@ import com.mcplatform.plugin.platform.menu.Token;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.protocol.economy.EconomyEndpoints;
 import com.mcplatform.protocol.economy.EconomyEventEntry;
+
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,21 +43,19 @@ public final class TransactionHistoryMenu {
 
     /** A type filter mapped 1:1 to the backend's single {@code type} query param ({@code null} = all). */
     enum Filter {
-        ALL(null, "Alle Buchungen", Icon.HISTORY),
-        CREDITED("CREDITED", "Gutschriften", Icon.CONFIRM),
-        DEBITED("DEBITED", "Abbuchungen", Icon.CANCEL),
-        TRANSFER_IN("TRANSFER_IN", "Erhaltene Transfers", Icon.CONFIRM),
-        TRANSFER_OUT("TRANSFER_OUT", "Gesendete Transfers", Icon.CANCEL),
-        SET("SET", "Admin-Korrekturen", Icon.VALUE);
+        ALL(null, "Alle Buchungen"),
+        CREDITED("CREDITED", "Gutschriften"),
+        TRANSFER_IN("TRANSFER_IN", "Erhaltene Transfers"),
+        TRANSFER_OUT("TRANSFER_OUT", "Gesendete Transfers"),
+        DEBITED("DEBITED", "Abbuchungen"),
+        SET("SET", "Admin-Korrekturen");
 
         private final String type;
         private final String label;
-        private final Icon icon;
 
-        Filter(String type, String label, Icon icon) {
+        Filter(String type, String label) {
             this.type = type;
             this.label = label;
-            this.icon = icon;
         }
 
         String type() {
@@ -65,13 +66,13 @@ public final class TransactionHistoryMenu {
             return label;
         }
 
-        Icon icon() {
-            return icon;
-        }
-
-        Filter next() {
-            Filter[] all = values();
-            return all[(ordinal() + 1) % all.length];
+        /** The cycle options for this filter set, in declaration order. */
+        static List<CycleControl.Option<Filter>> options() {
+            List<CycleControl.Option<Filter>> opts = new ArrayList<>(values().length);
+            for (Filter f : values()) {
+                opts.add(new CycleControl.Option<>(f.label(), f));
+            }
+            return opts;
         }
     }
 
@@ -93,7 +94,8 @@ public final class TransactionHistoryMenu {
     private boolean loaded;
     private boolean truncated;
     private int page;
-    private Filter filter = Filter.ALL;
+    /** Reusable type-filter control: left-click next, right-click previous (shared {@link CycleControl}). */
+    private final CycleControl<Filter> filter = new CycleControl<>(Icon.FILTER, "Filter", Filter.options());
 
     public TransactionHistoryMenu(UUID target, String targetName, String currency,
                                   BackendClient backend, PlatformScheduler scheduler) {
@@ -128,8 +130,9 @@ public final class TransactionHistoryMenu {
     private void fetchFrom(MenuView view, List<EconomyEventEntry> accumulated, Long before) {
         Map<String, String> query = new LinkedHashMap<>();
         query.put("currency", currency);
-        if (filter.type() != null) {
-            query.put("type", filter.type());
+        String type = filter.current().type();
+        if (type != null) {
+            query.put("type", type);
         }
         if (before != null) {
             query.put("before", Long.toString(before));
@@ -195,33 +198,22 @@ public final class TransactionHistoryMenu {
             ctx.view().feedback(Feedback.NAVIGATE);
             load(ctx.view());
         }));
-        menu.setItem(FILTER_SLOT, filterButton());
+        // The shared cycle control renders itself (left-click next, right-click previous); on a change we
+        // re-read from the backend because a different filter means a different result set.
+        menu.setItem(FILTER_SLOT, filter.button(ctx -> {
+            ctx.view().feedback(Feedback.NAVIGATE);
+            load(ctx.view());
+        }));
     }
 
     private IconSpec headerIcon() {
         Lore lore = Lore.builder().describe("Kontobewegungen von " + targetName + ".");
         if (loaded) {
             lore.value("Einträge:", entries.size() + (truncated ? "+ (gekürzt)" : ""));
-            lore.value("Filter:", filter.label());
+            lore.value("Filter:", filter.currentOption().label());
         }
         return IconSpec.head(target, MenuText.name(targetName, Token.ENTITY),
                 lore.clickToOpen("aktualisieren").build());
-    }
-
-    private MenuItem filterButton() {
-        return MenuItem.button(
-                IconSpec.of(filter.icon(), MenuText.name("Filter: " + filter.label(), Token.INFO),
-                        Lore.builder()
-                                .describe("Aktuell: " + filter.label() + ".")
-                                .clickToOpen("Filter wechseln")
-                                .build()),
-                this::cycleFilter);
-    }
-
-    void cycleFilter(ClickContext ctx) {
-        ctx.view().feedback(Feedback.NAVIGATE);
-        this.filter = filter.next();
-        load(ctx.view()); // a different filter means a different result set → re-read from the backend
     }
 
     // ── states ──────────────────────────────────────────────────────────────────────────────────────
@@ -254,19 +246,32 @@ public final class TransactionHistoryMenu {
     // ── one history entry (display-only) ─────────────────────────────────────────────────────────────
 
     private MenuItem entryItem(EconomyEventEntry entry) {
+        String unit = EconomyFeature.currencyDisplay(currency);
         Lore lore = Lore.builder()
                 .describe(EconomyHistoryFormat.typeLabel(entry.eventType()))
-                .value("Betrag:", EconomyHistoryFormat.amount(entry) + " " + currency)
-                .value("Stand danach:", EconomyHistoryFormat.grouped(entry.balanceAfter()) + " " + currency)
-                .value("Quelle:", entry.source())
+                .value("Betrag:", EconomyHistoryFormat.amount(entry) + " " + unit)
+                .value("Stand danach:", EconomyHistoryFormat.grouped(entry.balanceAfter()) + " " + unit);
+        // For a transfer, show the other party: "Von" on a received leg, "An" on a sent leg.
+        if (entry.counterpartyUuid() != null) {
+            String label = EconomyHistoryFormat.isIncoming(entry.eventType()) ? "Von:" : "An:";
+            lore.value(label, counterpartyName(entry.counterpartyUuid()));
+        }
+        lore.value("Quelle:", entry.source())
                 .value("Zeit:", EconomyHistoryFormat.time(entry.timestampEpochMilli()));
         if (entry.correlationId() != null) {
             lore.value("Transfer:", EconomyHistoryFormat.shortId(entry.correlationId()));
         }
         IconSpec icon = IconSpec.of(EconomyHistoryFormat.icon(entry.eventType()),
-                MenuText.name(EconomyHistoryFormat.amount(entry) + " " + currency,
+                MenuText.name(EconomyHistoryFormat.amount(entry) + " " + unit,
                         EconomyHistoryFormat.amountToken(entry.eventType())),
                 lore.build());
         return MenuItem.display(icon);
+    }
+
+    /** Best-effort display name for a transfer counterparty; falls back to a short UUID when unknown. */
+    private static String counterpartyName(UUID uuid) {
+        OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
+        String name = player.getName();
+        return name != null ? name : EconomyHistoryFormat.shortId(uuid);
     }
 }

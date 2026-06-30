@@ -27,6 +27,7 @@ public final class Profiles {
     public static final String TEST_EVENT_ID = "TEST_EVENT";
 
     // Label / value / blank line ids (value ids stay stable for live addressing + provider swap).
+    public static final LineId FIRST_BLANK = LineId.of("first-blank");
     public static final LineId RANK_LABEL = LineId.of("rank_label");
     public static final LineId RANK = LineId.of("rank");
     public static final LineId BLANK1 = LineId.of("blank1");
@@ -45,6 +46,7 @@ public final class Profiles {
     /** Build the catalog with the real coins/rank providers injected. */
     public static ProfileCatalog catalog(LineProvider coins, LineProvider rank) {
         ScoreboardProfile def = ScoreboardProfile.profile(DEFAULT_ID,
+                new ScoreboardLine(FIRST_BLANK, blank()),
                 new ScoreboardLine(RANK_LABEL, label("Rank", NamedTextColor.AQUA)),
                 new ScoreboardLine(RANK, rank),
                 new ScoreboardLine(BLANK1, blank()),

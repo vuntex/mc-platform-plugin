@@ -1,11 +1,13 @@
 package com.mcplatform.plugin.feature.punishment;
 
+import com.mcplatform.plugin.platform.ActionBars;
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.platform.menu.MenuText;
 import com.mcplatform.plugin.platform.menu.MenuView;
 import com.mcplatform.plugin.platform.menu.PlayerPickerMenu;
 import com.mcplatform.plugin.platform.menu.Token;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.protocol.punishment.PunishmentEndpoints;
 import com.mcplatform.protocol.punishment.TemplateResponse;
@@ -48,11 +50,11 @@ public final class PunishMenuCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("§cNur Spieler können das Menü öffnen.");
+            sender.sendMessage(Messages.playersOnly());
             return true;
         }
         if (!player.hasPermission(PERMISSION)) {
-            player.sendMessage("§cKeine Berechtigung.");
+            ActionBars.error(player, Messages.noPermission());
             return true;
         }
 

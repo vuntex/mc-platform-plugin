@@ -62,11 +62,13 @@ public final class CoinLineAnimator implements CoinLineRenderer {
         Runnable tick = () -> {
             value[0] += increment;
             if (value[0] >= target) {
-                set(player, handle, line, target);
+                set(player, handle, line, target); // settles back to the neutral (white) value
                 sound.coinComplete(player);
                 stop(player);
             } else {
-                set(player, handle, line, value[0]);
+                // intermediate count-up step renders green to highlight the gain effect
+                handle.update(line, EconomyLineProvider.coinComponentAnimating(value[0]));
+                shown.put(player, value[0]);
                 sound.coinTick(player);
             }
         };

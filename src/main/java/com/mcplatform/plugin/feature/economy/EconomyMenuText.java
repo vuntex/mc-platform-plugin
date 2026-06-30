@@ -2,6 +2,7 @@ package com.mcplatform.plugin.feature.economy;
 
 import com.mcplatform.plugin.platform.menu.MenuMessage;
 import com.mcplatform.plugin.platform.menu.Token;
+import com.mcplatform.plugin.platform.text.ChatDesign;
 import com.mcplatform.plugin.transport.BackendException;
 
 import java.util.concurrent.CompletionException;
@@ -31,7 +32,8 @@ final class EconomyMenuText {
     }
 
     static MenuMessage transferSuccess(long amount, String currency, String toName) {
-        return MenuMessage.chat(amount + " " + currency + " an " + toName + " gesendet.", Token.POSITIVE);
+        return MenuMessage.chat(ChatDesign.number(amount) + " " + EconomyFeature.currencyDisplay(currency)
+                + " an " + toName + " gesendet.", Token.POSITIVE);
     }
 
     static MenuMessage historyError(Throwable error) {

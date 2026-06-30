@@ -28,6 +28,8 @@ public enum Icon {
     INFO("BOOK"),
     MANAGE("WRITABLE_BOOK"),
     HISTORY("BOOK"),
+    /** Filter toggle — a funnel (hopper). */
+    FILTER("HOPPER"),
     VALUE("OAK_SIGN"),
     DURATION("CLOCK"),
     /** Danger / punishment — render with attributes hidden. */

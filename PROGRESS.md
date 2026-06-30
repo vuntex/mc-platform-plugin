@@ -895,3 +895,31 @@ Ausfall alle Nicht-Bypass-Spieler ein, bis das Backend wieder gesund ist.
   (247 Tests, 0 Fehler). Enforcement-Listener = Server-Smoke (manuell). Neue Joins bei totem Backend werden
   ohnehin schon vom fail-closed PreLogin-Permission-Warmup gekickt → der Lockdown schützt die bereits
   online-Spieler.
+
+## Economy-Monitoring + Alerts (achtes Feature, `feature.economyalert` + Backend)
+
+Trackt das **Geld im Umlauf** und meldet **auffällig hohe Bewegungen** an Admins. **Backend erkennt**
+(sieht ALLE Bewegungen — Transfer/Admin-SET/Web/Rewards), **Plugin broadcastet**.
+
+- **Erkennung ohne Core-Eingriff:** `AlertingBalanceEventPublisher` (App-Decorator) umschließt den
+  `RedisBalanceEventPublisher` — der `BalanceEventPublisher`-Bean wird in `EconomyConfig` getauscht, also
+  bleibt `EconomyService` (+ Tests) unverändert. `EconomyAlertMonitor` (pure) bewertet jedes
+  `AppliedEconomyEvent`.
+- **Kriterien (Alert, wenn eines zutrifft):** Betrag > `circulation-percent` (5 %) des Umlaufs **oder**
+  (bei Abgängen / Sender-Seite eines Transfers) > `sender-balance-percent` (80 %) des Sender-Guthabens
+  davor. Mindestbetrag `min-amount` (1.000) als Rausch-Filter.
+- **Von/An bei Transfers:** Ein `/pay` erzeugt OUT+IN-Legs (gleiche correlationId, direkt nacheinander).
+  Der Monitor stasht das OUT-Leg und kombiniert es mit dem IN-Leg zu **EINEM** Alert mit **Von (Sender) +
+  An (Empfänger)** — kein doppelter Alert.
+- **Umlauf:** `JooqEconomyRepository.circulation()` (`GROUP BY currency` SUM+COUNT), gecacht in
+  `EconomyStatsService`, per `@Scheduled` (Start + alle 60 s) aktualisiert. `GET /api/economy/stats/{currency}`
+  (`EconomyStatsController`) liefert den Snapshot.
+- **Protocol (additiv):** `EconomyAlertEvent` (+`targetUuid`) + `EconomyAlertEventCodec` (in
+  `PlatformProtocol.create()`), `EconomyChannels.ALERT = mc:economy:alert`, `EconomyStatsResponse`,
+  `EconomyEndpoints.STATS`.
+- **Plugin:** `EconomyAlertFeature` abonniert `mc:economy:alert` → gestylter Broadcast (Von/An, Betrag,
+  Grund) an Online-Holder von `mcplatform.economy.alerts` (warm-cache-Gate via `PermissionFeature.gate()`)
+  + Console-WARN. Backend loggt zusätzlich server-seitig.
+- **Tests grün:** `EconomyAlertEventCodecTest` (Wire-Roundtrip inkl. null target), `EconomyAlertMonitorTest`
+  (Kriterien + Transfer-Von/An-Korrelation, kein Duplikat). Beide Repos bauen.
+- **Bewusst später:** dynamische Limits (z. B. /pay-Schwelle aus dem Umlauf ableiten) — erst Monitoring.

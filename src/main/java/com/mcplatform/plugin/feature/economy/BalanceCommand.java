@@ -1,6 +1,8 @@
 package com.mcplatform.plugin.feature.economy;
 
 import com.mcplatform.plugin.platform.PlatformScheduler;
+import com.mcplatform.plugin.platform.text.ChatDesign;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.BackendException;
 import com.mcplatform.plugin.transport.FeatureCache;
@@ -57,7 +59,7 @@ public final class BalanceCommand implements CommandExecutor {
         final String targetName;
         if (args.length == 0) {
             if (!(sender instanceof Player self)) {
-                sender.sendMessage("Bitte einen Spieler angeben: /balance <Spieler>");
+                sender.sendMessage(Messages.usage("/balance <Spieler>"));
                 return true;
             }
             target = self.getUniqueId();
@@ -65,7 +67,7 @@ public final class BalanceCommand implements CommandExecutor {
         } else {
             OfflinePlayer resolved = resolve(args[0]);
             if (resolved == null || resolved.getUniqueId() == null) {
-                sender.sendActionBar(Component.text("§cSpieler wurde nicht gefunden."));
+                sender.sendActionBar(Messages.playerNotFound(args[0]));
                 return true;
             }
             target = resolved.getUniqueId();
@@ -109,9 +111,10 @@ public final class BalanceCommand implements CommandExecutor {
     }
 
     private void send(CommandSender sender, String name, long balance, boolean self) {
+        String value = ChatDesign.number(balance) + " " + EconomyFeature.currencyDisplay(currency);
         sender.sendMessage(self
-                ? "Dein Kontostand: " + balance + " " + currency
-                : "Kontostand von " + name + ": " + balance + " " + currency);
+                ? "Dein Kontostand: " + value
+                : "Kontostand von " + name + ": " + value);
     }
 
     /** Futures complete exceptionally with the raw cause, but compositions wrap it in CompletionException. */

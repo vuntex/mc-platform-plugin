@@ -1,6 +1,7 @@
 package com.mcplatform.plugin.feature.health;
 
 import com.mcplatform.plugin.feature.permission.PermissionGate;
+import com.mcplatform.plugin.platform.ActionBars;
 import com.mcplatform.plugin.platform.menu.ClickContext;
 import com.mcplatform.plugin.platform.menu.ConfirmDialog;
 import com.mcplatform.plugin.platform.menu.Icon;
@@ -10,6 +11,8 @@ import com.mcplatform.plugin.platform.menu.Menu;
 import com.mcplatform.plugin.platform.menu.MenuManager;
 import com.mcplatform.plugin.platform.menu.MenuText;
 import com.mcplatform.plugin.platform.menu.Token;
+import com.mcplatform.plugin.platform.text.ChatDesign;
+import com.mcplatform.plugin.platform.text.Messages;
 
 import net.kyori.adventure.text.*;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -50,17 +53,16 @@ public final class MaintenanceKickCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Nur Spieler können diesen Befehl nutzen.");
+            sender.sendMessage(Messages.playersOnly());
             return true;
         }
         if (gate == null || !gate.has(player.getUniqueId(), bypassNode)) {
-            player.sendMessage(Component.text("Dafür fehlt dir die Berechtigung.", NamedTextColor.RED));
+            ActionBars.error(player, Messages.noPermission());
             return true;
         }
         if (!monitor.isLocked()) {
-            player.sendMessage(Component.text(
-                    "Kein Wartungsmodus aktiv — der Befehl ist nur bei einem Backend-Ausfall verfügbar.",
-                    NamedTextColor.RED));
+            player.sendMessage(ChatDesign.error(
+                    "Kein Wartungsmodus aktiv — der Befehl ist nur bei einem Backend-Ausfall verfügbar."));
             return true;
         }
 

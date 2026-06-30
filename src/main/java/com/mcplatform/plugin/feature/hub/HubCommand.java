@@ -2,6 +2,7 @@ package com.mcplatform.plugin.feature.hub;
 
 import com.mcplatform.plugin.platform.menu.ClickContext;
 import com.mcplatform.plugin.platform.menu.MenuManager;
+import com.mcplatform.plugin.platform.text.Messages;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -30,7 +31,7 @@ public final class HubCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can open the menu.");
+            sender.sendMessage(Messages.playersOnly());
             return true;
         }
         boolean canPunish = player.hasPermission(PUNISH_PERMISSION);

@@ -34,7 +34,7 @@ class BalanceMenuTest {
 
         assertTrue(menu.isLive(), "balance menu is LIVE");
         assertSame(player, menu.live().orElseThrow().topic(), "observes this player's topic");
-        assertTrue(valueName(menu).contains("500 COINS"), "shows the current balance");
+        assertTrue(valueName(menu).contains("500 Coins"), "shows the current balance");
     }
 
     @Test
@@ -58,6 +58,6 @@ class BalanceMenuTest {
 
         assertEquals(1, view.slotWrites.size(), "only one slot re-rendered");
         MenuItem updated = view.slotWrites.get(BalanceMenu.VALUE_SLOT);
-        assertTrue(updated.icon().name().text().contains("750 COINS"), "value slot shows the new balance");
+        assertTrue(updated.icon().name().text().contains("750 Coins"), "value slot shows the new balance");
     }
 }

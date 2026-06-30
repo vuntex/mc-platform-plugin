@@ -2,7 +2,9 @@ package com.mcplatform.plugin.platform;
 
 import com.mcplatform.plugin.feature.FeatureContext;
 import com.mcplatform.plugin.feature.FeatureRegistry;
+import com.mcplatform.plugin.feature.chat.ChatFeature;
 import com.mcplatform.plugin.feature.economy.EconomyFeature;
+import com.mcplatform.plugin.feature.economyalert.EconomyAlertFeature;
 import com.mcplatform.plugin.feature.hub.HubFeature;
 import com.mcplatform.plugin.feature.permission.PermissionFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
@@ -76,8 +78,8 @@ public final class McPlatformPlugin extends JavaPlugin {
         // (spec §4 — consume existing caches). Registration order guarantees both enable before the
         // scoreboard, so their read-ports exist when the scoreboard's onEnable runs.
         long payConfirmThreshold = getConfig().getLong("economy.pay-confirm-threshold", 50_000L);
-        EconomyFeature economy = new EconomyFeature(menus, payConfirmThreshold);
         PermissionFeature permission = new PermissionFeature(menus);
+        EconomyFeature economy = new EconomyFeature(menus, permission, payConfirmThreshold);
 
         // Backend health check → maintenance lockdown. Interval/threshold read here in the composition
         // root (like the backend timeouts above) — no generic config/transport class changes.
@@ -95,6 +97,8 @@ public final class McPlatformPlugin extends JavaPlugin {
                 .register(new HubFeature(menus))
                 .register(new WebFeature(webLinkUrl, webResetUrl))
                 .register(new ScoreboardFeature(menus, economy, permission))
+                .register(new ChatFeature(permission))
+                .register(new EconomyAlertFeature(permission))
                 .register(new HealthFeature(menus, permission, healthIntervalSeconds,
                         healthFailureThreshold, healthRecommendKickAfterSeconds));
         this.features.enableAll(context);

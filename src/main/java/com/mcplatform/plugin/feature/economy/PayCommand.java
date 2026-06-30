@@ -1,5 +1,8 @@
 package com.mcplatform.plugin.feature.economy;
 
+import com.mcplatform.plugin.platform.ActionBars;
+import com.mcplatform.plugin.platform.text.ChatDesign;
+import com.mcplatform.plugin.platform.text.Messages;
 import com.mcplatform.plugin.platform.PlatformScheduler;
 import com.mcplatform.plugin.transport.BackendClient;
 import com.mcplatform.plugin.transport.BackendException;
@@ -21,7 +24,6 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
@@ -29,11 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@code /pay <Spieler> <Betrag>} — chat-only coin transfer (no menu). Amounts up to
- * {@code confirmThreshold} are sent immediately; a larger amount is held as a pending payment and must be
- * confirmed by clicking a chat message ({@code /pay confirm}). The backend stays authoritative on funds
- * (422) and validity (400/404). All feedback is rendered as styled Adventure components.
+ * {@code confirmThreshold} send immediately; larger ones are held and confirmed by clicking a chat
+ * message ({@code /pay confirm}). Backend stays authoritative on funds (422) and validity (400/404).
+ * All feedback uses the central chat design ({@link ChatDesign}/{@link Messages}); prefix "Coins".
  */
 public final class PayCommand implements CommandExecutor {
+
+    private static final String FEATURE = "COINS";
 
     private record Pending(UUID target, String targetName, long amount, long expiresAtMillis) {
     }
@@ -42,13 +46,16 @@ public final class PayCommand implements CommandExecutor {
 
     private final BackendClient backend;
     private final PlatformScheduler scheduler;
+    private final EconomyReadPort readPort;
     private final String currency;
     private final long confirmThreshold;
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
 
-    public PayCommand(BackendClient backend, PlatformScheduler scheduler, String currency, long confirmThreshold) {
+    public PayCommand(BackendClient backend, PlatformScheduler scheduler, EconomyReadPort readPort,
+                      String currency, long confirmThreshold) {
         this.backend = backend;
         this.scheduler = scheduler;
+        this.readPort = readPort;
         this.currency = currency;
         this.confirmThreshold = confirmThreshold;
     }
@@ -57,7 +64,7 @@ public final class PayCommand implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Nur Spieler können Coins senden.");
+            sender.sendMessage(Messages.playersOnly());
             return true;
         }
         if (args.length == 1 && args[0].equalsIgnoreCase("confirm")) {
@@ -66,14 +73,14 @@ public final class PayCommand implements CommandExecutor {
         }
         if (args.length == 1 && args[0].equalsIgnoreCase("cancel")) {
             if (pending.remove(player.getUniqueId()) != null) {
-                player.sendMessage(line("Zahlung abgebrochen.", NamedTextColor.GRAY));
+                player.sendMessage(prefixed(ChatDesign.text("Zahlung abgebrochen.")));
             } else {
-                player.sendMessage(line("Es gibt keine ausstehende Zahlung.", NamedTextColor.GRAY));
+                player.sendMessage(prefixed(ChatDesign.text("Es gibt keine ausstehende Zahlung.")));
             }
             return true;
         }
         if (args.length != 2) {
-            sendUsage(player);
+            player.sendMessage(Messages.usage("/pay <Spieler> <Betrag>"));
             return true;
         }
         handlePay(player, args[0], args[1]);
@@ -85,43 +92,54 @@ public final class PayCommand implements CommandExecutor {
         try {
             amount = Long.parseLong(amountArg.replace(".", "").replace("_", ""));
         } catch (NumberFormatException ex) {
-            player.sendMessage(line("Ungültiger Betrag — bitte eine ganze Zahl angeben.", NamedTextColor.RED));
+            ActionBars.error(player, ChatDesign.error("Ungültiger Betrag — bitte eine ganze Zahl angeben."));
             return;
         }
         if (amount <= 0) {
-            player.sendMessage(line("Der Betrag muss größer als 0 sein.", NamedTextColor.RED));
+            ActionBars.error(player, ChatDesign.error("Der Betrag muss größer als 0 sein."));
             return;
         }
         OfflinePlayer resolved = resolve(targetArg);
         if (resolved == null || resolved.getUniqueId() == null) {
-            player.sendMessage(line("Spieler ", NamedTextColor.RED)
-                    .append(Component.text(targetArg, NamedTextColor.WHITE))
-                    .append(Component.text(" wurde nicht gefunden.", NamedTextColor.RED)));
+            ActionBars.error(player, Messages.playerNotFound(targetArg));
             return;
         }
         if (resolved.getUniqueId().equals(player.getUniqueId())) {
-            player.sendMessage(line("Du kannst dir nicht selbst Coins senden.", NamedTextColor.RED));
+            ActionBars.error(player, ChatDesign.error("Du kannst dir nicht selbst Coins senden."));
             return;
         }
         String targetName = resolved.getName() != null ? resolved.getName() : targetArg;
+        UUID target = resolved.getUniqueId();
 
-        if (amount > confirmThreshold) {
-            pending.put(player.getUniqueId(),
-                    new Pending(resolved.getUniqueId(), targetName, amount, now() + CONFIRM_TIMEOUT_MILLIS));
-            sendConfirmPrompt(player, targetName, amount);
-            return;
-        }
-        transfer(player, resolved.getUniqueId(), targetName, amount);
+        // Funds check BEFORE confirming/transferring — never ask to confirm a payment that can't go through.
+        // Cache-first; if the balance is unknown (cold cache + REST miss) we proceed and let the backend stay
+        // authoritative (422). Either way the backend is the final guard.
+        final long finalAmount = amount;
+        readPort.load(player.getUniqueId()).whenComplete((balance, error) -> scheduler.runSync(() -> {
+            if (error == null && balance != null && balance.isPresent() && finalAmount > balance.getAsLong()) {
+                ActionBars.error(player, ChatDesign.error("Du hast nicht genug "
+                        + EconomyFeature.currencyDisplay(currency) + " — dein Guthaben: "
+                        + ChatDesign.number(balance.getAsLong()) + "."));
+                return;
+            }
+            if (finalAmount > confirmThreshold) {
+                pending.put(player.getUniqueId(),
+                        new Pending(target, targetName, finalAmount, now() + CONFIRM_TIMEOUT_MILLIS));
+                sendConfirmPrompt(player, targetName, finalAmount);
+                return;
+            }
+            transfer(player, target, targetName, finalAmount);
+        }));
     }
 
     private void confirmPending(Player player) {
         Pending p = pending.remove(player.getUniqueId());
         if (p == null) {
-            player.sendMessage(line("Es gibt keine ausstehende Zahlung zum Bestätigen.", NamedTextColor.GRAY));
+            player.sendMessage(prefixed(ChatDesign.text("Es gibt keine ausstehende Zahlung zum Bestätigen.")));
             return;
         }
         if (now() > p.expiresAtMillis()) {
-            player.sendMessage(line("Die Bestätigung ist abgelaufen — bitte erneut senden.", NamedTextColor.RED));
+            player.sendMessage(prefixed(ChatDesign.error("Die Bestätigung ist abgelaufen — bitte erneut senden.")));
             return;
         }
         transfer(player, p.target(), p.targetName(), p.amount());
@@ -133,78 +151,67 @@ public final class PayCommand implements CommandExecutor {
         backend.callIdempotent(EconomyEndpoints.TRANSFER, request, from.toString(), currency)
                 .whenComplete((response, error) -> scheduler.runSync(() -> {
                     if (error != null || response == null) {
-                        player.sendMessage(transferError(error));
+                        ActionBars.error(player, transferError(error)); // transient toast + sound
                         return;
                     }
-                    player.sendMessage(line("Du hast ", NamedTextColor.GREEN)
+                    player.sendMessage(prefixed(ChatDesign.success("Du hast ")
                             .append(amountComponent(amount))
-                            .append(Component.text(" an ", NamedTextColor.GREEN))
-                            .append(Component.text(targetName, NamedTextColor.AQUA))
-                            .append(Component.text(" gesendet.", NamedTextColor.GREEN)));
+                            .append(ChatDesign.success(" an "))
+                            .append(ChatDesign.name(targetName))
+                            .append(ChatDesign.success(" gesendet."))));
                     Player recipient = Bukkit.getPlayer(target);
                     if (recipient != null) {
-                        recipient.sendMessage(line("Du hast ", NamedTextColor.GREEN)
+                        recipient.sendMessage(prefixed(ChatDesign.success("Du hast ")
                                 .append(amountComponent(amount))
-                                .append(Component.text(" von ", NamedTextColor.GREEN))
-                                .append(Component.text(player.getName(), NamedTextColor.AQUA))
-                                .append(Component.text(" erhalten.", NamedTextColor.GREEN)));
+                                .append(ChatDesign.success(" von "))
+                                .append(ChatDesign.name(player.getName()))
+                                .append(ChatDesign.success(" erhalten."))));
                     }
                 }));
     }
 
     // ── messages ──────────────────────────────────────────────────────────────────────────────────
 
-    private void sendUsage(Player player) {
-        player.sendMessage(line("Verwendung: ", NamedTextColor.GOLD)
-                .append(Component.text("/pay <Spieler> <Betrag>", NamedTextColor.GRAY)));
-    }
-
     private void sendConfirmPrompt(Player player, String targetName, long amount) {
         player.sendMessage(Component.empty());
-        player.sendMessage(Component.text("Großer Betrag — bitte bestätigen", NamedTextColor.GOLD, TextDecoration.BOLD));
-        player.sendMessage(Component.text("Du sendest ", NamedTextColor.GRAY)
+        player.sendMessage(prefixed(Component.text("Großer Betrag — bitte bestätigen", NamedTextColor.GOLD,
+                TextDecoration.BOLD)));
+        player.sendMessage(prefixed(ChatDesign.text("Du sendest ")
                 .append(amountComponent(amount))
-                .append(Component.text(" an ", NamedTextColor.GRAY))
-                .append(Component.text(targetName, NamedTextColor.WHITE))
-                .append(Component.text(".", NamedTextColor.GRAY)));
+                .append(ChatDesign.text(" an "))
+                .append(ChatDesign.name(targetName))
+                .append(ChatDesign.text("."))));
         Component confirm = Component.text(" [ ✔ Bestätigen ] ", NamedTextColor.GREEN, TextDecoration.BOLD)
                 .clickEvent(ClickEvent.runCommand("/pay confirm"))
-                .hoverEvent(HoverEvent.showText(Component.text("Klicken, um zu senden", NamedTextColor.GRAY)));
+                .hoverEvent(HoverEvent.showText(ChatDesign.muted("Klicken, um zu senden")));
         Component cancel = Component.text(" [ ✘ Abbrechen ] ", NamedTextColor.RED, TextDecoration.BOLD)
                 .clickEvent(ClickEvent.runCommand("/pay cancel"))
-                .hoverEvent(HoverEvent.showText(Component.text("Klicken, um abzubrechen", NamedTextColor.GRAY)));
+                .hoverEvent(HoverEvent.showText(ChatDesign.muted("Klicken, um abzubrechen")));
         player.sendMessage(confirm.append(cancel));
         player.sendMessage(Component.empty());
     }
 
     private Component transferError(Throwable error) {
         Throwable cause = unwrap(error);
-        String text;
         if (cause instanceof BackendException be) {
-            text = switch (be.statusCode()) {
-                case 422 -> "Du hast nicht genug " + currency + ".";
-                case 404 -> "Konto wurde nicht gefunden.";
-                case 400 -> "Ungültige Anfrage.";
-                default -> "Transfer fehlgeschlagen. Bitte später erneut versuchen.";
+            return switch (be.statusCode()) {
+                case 422 -> ChatDesign.error("Du hast nicht genug " + EconomyFeature.currencyDisplay(currency) + ".");
+                case 404 -> ChatDesign.error("Konto wurde nicht gefunden.");
+                case 400 -> ChatDesign.error("Ungültige Anfrage.");
+                default -> Messages.backendError();
             };
-        } else {
-            text = "Transfer fehlgeschlagen. Bitte später erneut versuchen.";
         }
-        return line(text, NamedTextColor.RED);
+        return Messages.backendError();
     }
 
-    /** Amount segment: the number in gray, the currency in green — reused across messages. */
+    /** Amount segment: number + currency, both highlighted (value yellow). */
     private Component amountComponent(long amount) {
-        return Component.text(format(amount), NamedTextColor.GRAY)
-                .append(Component.text(" " + currency, NamedTextColor.GREEN));
+        return ChatDesign.value(ChatDesign.number(amount) + " " + EconomyFeature.currencyDisplay(currency));
     }
 
-    private static Component line(String text, NamedTextColor color) {
-        return Component.text(text, color);
-    }
-
-    private static String format(long amount) {
-        return String.format(Locale.GERMANY, "%,d", amount); // 50000 → "50.000"
+    /** Prepend the "Coins »" feature prefix to a message body. */
+    private static Component prefixed(Component body) {
+        return ChatDesign.prefix(FEATURE, NamedTextColor.GOLD).append(body);
     }
 
     /** Resolve a name to an online or server-cached offline player, without a blocking Mojang lookup. */
