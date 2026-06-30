@@ -15,6 +15,18 @@ web:
   link-url: "http://localhost:3000/account/set-password?token={token}"
   reset-url: "http://localhost:3000/account/reset-password?token={token}"
 
+health:
+  # Backend health check → maintenance lockdown. The plugin polls GET /api/health every
+  # interval-seconds; after failure-threshold consecutive failures (404 / transport error / status
+  # != UP) it freezes non-bypass players (no move/build/interact/commands/chat) until the backend is
+  # healthy again. Staff with the node "mcplatform.maintenance.bypass" stay exempt.
+  interval-seconds: 5
+  failure-threshold: 2
+  # After this many seconds of sustained outage, staff get a clickable recommendation to kick all
+  # non-bypass players (/maintenancekick → confirm dialog). The freeze is immediate; only the
+  # recommendation is delayed.
+  kick-recommendation-after-seconds: 60
+
 redis:
   # Read-only Pub/Sub subscriber for live updates (e.g. mc:economy:balance).
   # The plugin only subscribes here; it never writes to Redis or reads backend-internal keys.

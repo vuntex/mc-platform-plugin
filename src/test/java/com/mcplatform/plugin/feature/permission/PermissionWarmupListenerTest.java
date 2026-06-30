@@ -45,7 +45,7 @@ class PermissionWarmupListenerTest {
     void successFillsCacheAndReturnsTrue() {
         UUID uuid = UUID.randomUUID();
         PlayerPermissionsResponse response = new PlayerPermissionsResponse(uuid,
-                List.of(), List.of(), List.of("mcplatform.permission.roles.manage"), null);
+                List.of(), List.of(), List.of("mcplatform.permission.roles.manage"), List.of(), null);
         PermissionCache cache = new PermissionCache();
         PermissionWarmupListener warmup = new PermissionWarmupListener(
                 new FixedBackend(CompletableFuture.completedFuture(response)), cache, logger);

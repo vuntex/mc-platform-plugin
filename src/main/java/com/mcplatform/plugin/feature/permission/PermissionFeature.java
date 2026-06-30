@@ -29,6 +29,8 @@ public final class PermissionFeature implements PluginFeature {
 
     private final MenuManager menus;
     private final PermissionCache cache = new PermissionCache();
+    private final PermissionReadPort readPort = new PermissionReadPort(cache);
+    private PermissionGate gate;
 
     /** The shared menu manager is injected by the composition root — no generic class is touched. */
     public PermissionFeature(MenuManager menus) {
@@ -40,12 +42,33 @@ public final class PermissionFeature implements PluginFeature {
         return "permission";
     }
 
+    /**
+     * Read-only view of the warm permission cache (plain rank display name) for sibling features
+     * (e.g. {@code feature.scoreboard}). Additive — no permission behaviour or generic class changes.
+     */
+    public PermissionReadPort readPort() {
+        return readPort;
+    }
+
+    /**
+     * Cache-based permission gate for sibling features (e.g. {@code feature.health}'s lockdown bypass).
+     * Reads the warm RAM cache, so node checks still work while the backend is down. Available after
+     * {@link #onEnable}. Additive — no permission behaviour or generic class changes.
+     */
+    public PermissionGate gate() {
+        return gate;
+    }
+
     @Override
     public void onEnable(FeatureContext context) {
         BackendClient backend = context.backend();
         PlatformScheduler scheduler = context.scheduler();
 
-        PermissionLoader loader = new PermissionLoader(backend, scheduler, cache, context.logger());
+        // onApplied notify (additive, 1 callback): after a live reload writes the cache, nudge the shared
+        // LIVE bus so observers (e.g. the scoreboard rank line) re-render AFTER the cache is fresh — this
+        // dissolves the async-reload race (scoreboard spec FR-006a). Economy already does the same.
+        PermissionLoader loader = new PermissionLoader(backend, scheduler, cache, context.logger(),
+                uuid -> menus.liveBus().notifyChange(uuid));
 
         // ── Cold start (US2): PreLogin warmup, fail-closed ───────────────────────────────────────────
         // Load effective permissions BEFORE the player enters the world and hard-kick on failure, on the
@@ -62,7 +85,7 @@ public final class PermissionFeature implements PluginFeature {
         context.eventBus().subscribe(
                 PermissionChannels.CHANGED, PermissionChangedEventCodec.INSTANCE, updater);
 
-        PermissionGate gate = new PermissionGate(cache, context.logger());
+        this.gate = new PermissionGate(cache, context.logger());
         IconResolver iconResolver = new IconResolver();
         PermissionInput chatInput = new PermissionInput(scheduler);
         context.registerListener(chatInput);

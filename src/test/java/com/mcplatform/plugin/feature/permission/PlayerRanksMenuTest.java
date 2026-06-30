@@ -63,7 +63,7 @@ class PlayerRanksMenuTest {
 
     private static RoleResponse role(long id, String name) {
         return new RoleResponse(id, name, name.toUpperCase(), null, null, null, null, null, "material:PAPER",
-                (int) id, false, true, false, List.of());
+                (int) id, false, true, false, List.of(), List.of());
     }
 
     private PlayerRanksMenu load(PlayerPermissionsResponse effective, RoleResponse[] roles) {
@@ -77,7 +77,7 @@ class PlayerRanksMenuTest {
     @Test
     void showsRanksDirectlyWithGrantAndPermissionsLink() {
         PlayerPermissionsResponse effective = new PlayerPermissionsResponse(target,
-                List.of(new ActiveGrant("vip", null, actor, null)), List.of(), List.of(), null);
+                List.of(new ActiveGrant("vip", null, actor, null, null)), List.of(), List.of(), List.of(), null);
         PlayerRanksMenu ranks = load(effective, new RoleResponse[]{role(1, "vip"), role(2, "admin")});
         Menu model = ranks.menu();
 
@@ -91,7 +91,7 @@ class PlayerRanksMenuTest {
     @Test
     void rolePickerOmitsRanksThePlayerAlreadyHas() {
         PlayerPermissionsResponse effective = new PlayerPermissionsResponse(target,
-                List.of(new ActiveGrant("vip", null, actor, null)), List.of(), List.of(), null);
+                List.of(new ActiveGrant("vip", null, actor, null, null)), List.of(), List.of(), List.of(), null);
         PlayerRanksMenu ranks = load(effective, new RoleResponse[]{role(1, "vip"), role(2, "admin"), role(3, "mod")});
 
         Menu picker = ranks.buildRolePicker();

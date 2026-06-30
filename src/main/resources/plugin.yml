@@ -72,6 +72,9 @@ commands:
   web:
     description: Manage your web account (create a link, or reset your password).
     usage: /web <link|resetPassword>
+  maintenancekick:
+    description: During a backend outage — open a confirm dialog to kick all non-staff players.
+    usage: /maintenancekick
 
 # Optimistic UI-gate only. The backend is the real authority on who may apply which
 # template/action and rejects with 403; these defaults just keep the in-game UX sane.

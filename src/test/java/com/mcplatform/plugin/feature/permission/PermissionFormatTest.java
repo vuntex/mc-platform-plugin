@@ -16,7 +16,7 @@ class PermissionFormatTest {
 
     private static RoleResponse role(String name, String displayName, int weight, boolean team) {
         return new RoleResponse(1L, name, displayName, null, null, null, null, null, null,
-                weight, team, true, false, List.of());
+                weight, team, true, false, List.of(), List.of());
     }
 
     @Test

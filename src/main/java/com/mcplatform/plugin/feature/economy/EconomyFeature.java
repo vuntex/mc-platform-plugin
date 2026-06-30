@@ -26,6 +26,7 @@ public final class EconomyFeature implements PluginFeature {
 
     private final FeatureCache<UUID, Long> balances = new FeatureCache<>();
     private final MenuManager menus;
+    private EconomyReadPort readPort;
 
     /** The shared menu manager is injected by the composition root — no generic class is touched. */
     public EconomyFeature(MenuManager menus) {
@@ -37,8 +38,19 @@ public final class EconomyFeature implements PluginFeature {
         return "economy";
     }
 
+    /**
+     * Read-only view of the balance cache for sibling features (e.g. {@code feature.scoreboard}).
+     * Available after {@link #onEnable}. Additive — no economy behaviour or generic class changes.
+     */
+    public EconomyReadPort readPort() {
+        return readPort;
+    }
+
     @Override
     public void onEnable(FeatureContext context) {
+        // Read-port over the existing balance cache, for sibling features (scoreboard) — additive.
+        this.readPort = new EconomyReadPort(context.backend(), balances, CURRENCY);
+
         // Live updates: version-checked cache refresh from mc:economy:balance, then nudge any open LIVE
         // balance menu for that player to re-render its value slot (same stream, new consumer).
         context.eventBus().subscribe(EconomyChannels.BALANCE, BalanceChangedEventCodec.INSTANCE,

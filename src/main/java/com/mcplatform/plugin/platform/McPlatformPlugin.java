@@ -6,7 +6,9 @@ import com.mcplatform.plugin.feature.economy.EconomyFeature;
 import com.mcplatform.plugin.feature.hub.HubFeature;
 import com.mcplatform.plugin.feature.permission.PermissionFeature;
 import com.mcplatform.plugin.feature.punishment.PunishmentFeature;
+import com.mcplatform.plugin.feature.health.HealthFeature;
 import com.mcplatform.plugin.feature.report.ReportFeature;
+import com.mcplatform.plugin.feature.scoreboard.ScoreboardFeature;
 import com.mcplatform.plugin.feature.session.SessionFeature;
 import com.mcplatform.plugin.feature.web.WebFeature;
 import com.mcplatform.plugin.platform.menu.MenuManager;
@@ -70,15 +72,30 @@ public final class McPlatformPlugin extends JavaPlugin {
         String webResetUrl = getConfig().getString(
                 "web.reset-url", "http://localhost:3000/account/reset-password?token={token}");
 
+        // Economy + permission are referenced so the scoreboard slice can consume their read-ports
+        // (spec §4 — consume existing caches). Registration order guarantees both enable before the
+        // scoreboard, so their read-ports exist when the scoreboard's onEnable runs.
+        EconomyFeature economy = new EconomyFeature(menus);
+        PermissionFeature permission = new PermissionFeature(menus);
+
+        // Backend health check → maintenance lockdown. Interval/threshold read here in the composition
+        // root (like the backend timeouts above) — no generic config/transport class changes.
+        int healthIntervalSeconds = getConfig().getInt("health.interval-seconds", 5);
+        int healthFailureThreshold = getConfig().getInt("health.failure-threshold", 2);
+        int healthRecommendKickAfterSeconds = getConfig().getInt("health.kick-recommendation-after-seconds", 60);
+
         // The ONE place features are plugged in. Add a feature = one more .register(...) line.
         this.features = new FeatureRegistry(getLogger())
                 .register(new SessionFeature()) // platform session gate — established first
-                .register(new EconomyFeature(menus))
+                .register(economy)
                 .register(new PunishmentFeature(menus))
                 .register(new ReportFeature(menus))
-                .register(new PermissionFeature(menus))
+                .register(permission)
                 .register(new HubFeature(menus))
-                .register(new WebFeature(webLinkUrl, webResetUrl));
+                .register(new WebFeature(webLinkUrl, webResetUrl))
+                .register(new ScoreboardFeature(menus, economy, permission))
+                .register(new HealthFeature(menus, permission, healthIntervalSeconds,
+                        healthFailureThreshold, healthRecommendKickAfterSeconds));
         this.features.enableAll(context);
 
         // Connect the bus only after features have registered their subscriptions.

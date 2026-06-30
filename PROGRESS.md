@@ -778,3 +778,109 @@ Live-/Pub-Sub-Pfad, R7).
   richtiger Endpoint+UUID/Erfolg-Link/409-429-5xx gegen Recording-Fake-Backend, `WebFeatureTest`
   Ein-Anstecken/Dedup), alle Bukkit-frei. Build/JAR grün (Ausnahme: 2 vorbestehende `DurationPickerTest`-
   Fehler aus dem Permission-Slice, unabhängig von `feature.web` — auf sauberem HEAD identisch reproduzierbar).
+
+## Scoreboard — Render-Schicht, Slice 1 (sechstes Feature, `feature.scoreboard`)
+
+Rein **Plugin-seitiger** Render-Slice (Inventar #72, nur Scoreboard-Teil). Spec/Plan/Tasks:
+`specs/003-scoreboard-render/`. Zeigt jedem online Spieler eine kontextabhängige Sidebar in
+**Adventure-Components** (kein NMS, keine §-Codes), **farbig** im Label-über-Wert-Muster: farbiger,
+fetter Titel „MC Platform" (Sidebar-Title) und Zeilen `Rank`/Wert/leer · `Münzen`/Wert/leer ·
+`Kills`/Wert (Slice-1-Profil „Default"; Werte aus Economy/Permission, Stats als Stub). Label-Farben
+AQUA/GOLD/GREEN, Rang-Wert weiß, Coins-Wert gelb. Werte kommen aus den **vorhandenen** Economy/Permission-Caches — **keine Parallel-Cache, kein
+eigener Backend-Zugriff** (constitution-konform „Backend = Wahrheit", aber dieser Slice hat **bewusst
+keinen** Backend-/`plugin-protocol`-/Channel-/REST-Anteil).
+
+- **Bewusste Grenzen:** kein Backend-Modul, keine `plugin-protocol`-Änderung, kein neuer Channel/Endpoint.
+  Nicht in Slice 1 (jeweils Folge-Slice): TabList, Chat-Format, Toggle-Persistenz (braucht Settings #9),
+  Currency-Zähl-Animation/Sound (gehört in `feature.economy`), echtes Region-System (ersetzt nur den Stub).
+- **Selektion vs. Komposition getrennt:** `ProfileResolver` (geordnete `ConditionRule`s, erste-passende,
+  Default-Fallback; `RegionCondition` gegen `StubRegionProvider` — echtes Region-System ersetzt nur den
+  Stub) wählt das Profil; `LineProvider`s (Economy/Permission echt, Static/Stub) liefern die Zeilen. Der
+  `ScoreboardRenderer` kennt nur „Profil → Zeilen → Components". Stabile `LineId`s (nicht Index) adressieren
+  Live-Updates und überleben Umsortierung.
+- **Flicker-Strategie (P2): Team-Entry-Slots.** `BukkitScoreboardHandle` kapselt Objective + ein Team je
+  Position (unsichtbarer Entry als stabiler Slot, Text im `Team#prefix(Component)`); ein Update ändert nur
+  den Prefix des betroffenen Slots → flickerfrei, exakt per `LineId` adressiert.
+- **Live-Update über `MenuLiveBus`-Reuse — KEINE eigene Transport-Subscription.** Das Scoreboard beobachtet
+  `menus.liveBus()` je Spieler-UUID und re-rendert nur die dynamischen Zeilen (Coins/Rang) aus den
+  Read-Ports (last-write-wins, kein Debounce). Economy feuert `notifyChange` bereits nach `apply`;
+  **Permission feuert es jetzt ebenfalls** (1 additive Zeile in `PermissionLoader`, nach `cache.apply`) —
+  das löst die async-Reload-Race für die Rang-Zeile (P1). `PermissionChangedEvent` kommt **pro Holder** →
+  kein Fan-out im Scoreboard nötig. Coins beim Join über `EconomyReadPort.load` (cache-first+REST-fallback,
+  da Economy-Cache lazy/kalt am Join). Leave → `LiveHandle.close()` + `handle.teardown()` (kein Leak, AC-6).
+- **Geschwister-Berührung (additiv, transparent — plan.md §10):** neuer Read-Port `EconomyReadPort` und
+  `PermissionReadPort` auf den **bestehenden** Caches + die eine `notifyChange`-Zeile in `PermissionLoader`
+  + Composition-Root-Verdrahtung (`new ScoreboardFeature(menus, economy, permission)`). **Keine der
+  geschützten Generika geändert** (FeatureCache/EventBus/BackendClient/MenuBuilder/PluginFeature/Scheduler);
+  `MenuLiveBus` nur genutzt, nicht geändert → kein Muster-Leck-STOPP.
+- **P4 (Doku-Drift) erledigt:** Der Plugin-seitige Permission-Slice ist bereits in dieser PROGRESS.md
+  dokumentiert (Abschnitt „Permission/Rank-System — Plugin-Slice"); die Spec-Annahme P4 ist damit erfüllt.
+  Ein `FEATURE_INVENTORY.md` existiert im Plugin-Repo nicht (Inventar wird backend-seitig geführt).
+- **Tests grün:** 35 Scoreboard-/Port-Tests, alle Bukkit-frei (Fake-Scheduler/-Backend, Recording-Handle,
+  echter `MenuLiveBus`): Modell/LineId-Stabilität, Renderer, Handle-Contract, Resolver (erste-passende +
+  Default), RegionCondition, Provider (Rang **plain**, FR-003a), Catalog/Stub-Austausch, ServiceFlow
+  (Join/Live-Coins/Live-Rang/Leave), beide Read-Ports, `PermissionLoader`-Notify-Regression. Die
+  Bukkit-Scoreboard-Mechanik (`BukkitScoreboardHandle`) ist Smoke-Test-Sache (manueller „es lebt"-Lauf).
+  **Gesamt-Build grün: `./gradlew build` → BUILD SUCCESSFUL, 241 Tests, 0 Fehler, Shadow-JAR gebaut.**
+  *(Nebenbei mitgezogen: 6 Permission-/Transport-Testklassen wurden an die gebumpten `plugin-protocol`-
+  Record-Shapes angepasst — `PlayerPermissionsResponse.sources`, `RoleResponse.inheritedRoleIds`,
+  `ActiveGrant.issuedByName`. Reine Test-Anpassung, kein Produktionscode berührt.)*
+
+## Backend-HealthCheck + Wartungs-Lockdown (siebtes Feature, `feature.health`)
+
+Schützt vor Zustands-Drift, wenn das Backend (Source of Truth) wegfällt. Pollt periodisch und friert bei
+Ausfall alle Nicht-Bypass-Spieler ein, bis das Backend wieder gesund ist.
+
+- **Backend:** `GET /api/health` als **Deep-Readiness-Check** (`HealthController` im `:app`-Modul, weil es
+  `DataSource` + `RedisHealthIndicator` braucht und `:api-rest` nicht von `:app` abhängen darf). Prüft gezielt
+  **DB** (`Connection.isValid`, 1s) **und Redis** (`RedisHealthIndicator`/`cache.ping()`). Antwortet **immer
+  200** mit `HealthResponse(status, components)` — `components` = `{db: UP|DOWN, redis: UP|DOWN}`, `status` =
+  UP nur wenn alle UP. Immer-200 (statt 503), damit die **Komponenten-Detailinfo das Plugin erreicht** (sonst
+  ginge sie hinter einem 5xx verloren). Gezielt DB+Redis (nicht das Actuator-Aggregat), damit z. B.
+  `diskSpace` keinen Fehl-Lockdown auslöst. `permitAll`. Protocol-Eintrag `HealthEndpoints.CHECK` /
+  `HealthResponse(status, components)` (additiv, nach mavenLocal publiziert). **Deckt nicht nur „Prozess weg"
+  (Transport-Fehler/404), sondern auch „App läuft, aber DB/Redis tot" ab.**
+- **Probe:** `HealthFeature` plant via `scheduler.runSyncTimer` alle `health.interval-seconds` (Default 5s)
+  einen nicht-blockierenden `BackendClient.call(HealthEndpoints.CHECK)`; Ergebnis hüpft per `runSync` zurück.
+- **Zustandsmaschine** `BackendHealthMonitor` (Bukkit-frei, getestet): sperrt nach `failure-threshold`
+  (Default 2) aufeinanderfolgenden Fehlern (404 / Transport-Fehler / `status != UP`), entsperrt beim ersten
+  Erfolg. Ein einzelner Blip sperrt also nicht. `isLocked()` ist `volatile` (Async-Chat-Listener liest es).
+- **Lockdown** (`MaintenanceListener`): friert Nicht-Bypass-Spieler **vollständig** ein — jede Bewegung
+  **inkl. Umschauen** (jede Positions- ODER Rotationsänderung wird gecancelt), **kein Schaden** jeglicher
+  Ursache (`EntityDamageEvent` gecancelt → kein Tod durch Monster/Fall/Feuer), dazu Block-Break/Place,
+  Interaktion, Befehle und Chat (`AsyncChatEvent`). Zusätzlich **kein Knockback/Push** (`PlayerVelocityEvent`
+  gecancelt → Explosionen/Pistons/Wasser schieben nicht). Staff mit `mcplatform.maintenance.bypass` bleiben
+  frei — gelesen aus dem **warmen** Permission-Cache über `PermissionFeature.gate()`, funktioniert also auch
+  bei totem Backend.
+- **Flug-Kick-Fix:** Wird ein Spieler in der Luft eingefroren, würde die Server-Flugprüfung „Flying is not
+  enabled on this server" kicken (in der Luft, fällt nicht). Daher setzt der Lockdown für Betroffene
+  `setAllowFlight(true)` + `setFlying(true)` (deaktiviert die Prüfung + sauberes Schweben), jeden Tick
+  re-asserted; beim Unlock zurückgesetzt (außer Creative/Spectator).
+- **Staff-Benachrichtigung (Bypass-Holder):** Admins werden NICHT eingefroren, aber **aktiv informiert —
+  inkl. WAS down ist** (aus der `components`-Map): Chat-Alert bei Lock („⚠ Wartungsmodus aktiv — Redis nicht
+  erreichbar. (Du bist ausgenommen.)") und Unlock, plus eine **dauerhafte Action-Bar** mit dem Grund
+  („⚠ Redis nicht erreichbar", jeden Probe-Tick neu). Der Grund wird im Plugin aus den Komponenten gebildet
+  (`describe`/`label`: db→Datenbank, redis→Redis); ist das Backend ganz weg (Transport/404) → „Backend nicht
+  erreichbar". Mid-Lockdown-Joiner werden je nach Bypass als Staff (Alert) oder Spieler (Freeze) geroutet.
+- **Empfohlene Kick-Aktion (statt Auto-Kick), verzögert:** Bleibt der Ausfall **länger als
+  `health.kick-recommendation-after-seconds` (Default 60 s)** bestehen, bekommt Staff **einmalig** eine
+  **klickbare** Zeile „» Empfehlung: alle Spieler kicken «" (`ClickEvent.runCommand("/maintenancekick")`).
+  Der Befehl öffnet ein **kritisches `ConfirmDialog`** (Doppelklick, mit Lore-Description auf Objekt-Icon
+  + „Alle kicken"-Button); bei Bestätigung werden alle **Nicht-Bypass**-Spieler mit „Server-Wartung — bitte
+  in Kürze erneut verbinden." gekickt (`MaintenanceKickCommand`). **Nur bei aktivem Wartungsmodus nutzbar** —
+  geprüft beim Command-Ausführen **und** erneut beim Confirm-Klick (Backend evtl. wieder da → Kick
+  abgebrochen). Gating über den **warmen `PermissionGate`** (nicht Bukkit-Perms) → funktioniert auch bei totem
+  Backend; derselbe Bypass-Node autorisiert den Befehl und verschont seine Holder vom Kick. **Begründung
+  (Design):** Kick verliert hier KEINE Daten — Inventar/Position speichert der Server selbst auf Platte,
+  Backend-Daten haben keinen lokalen Write-Back-Puffer (Quit-Listener machen nur `cache.remove`). Bewusst
+  manuell + bestätigt statt automatisch.
+- **Permanenter Titel:** Der „⚠ Wartung"-Title wird bei Lock sofort gezeigt und **jeden Probe-Tick neu
+  gesendet** (Stay = Intervall + 2 s, kein Fade → nahtlos, verschwindet nie); Mid-Lockdown-Joiner bekommen
+  ihn sofort. Unlock → `clearTitle()` + Chat-Hinweis. Lock/Unlock broadcastet zusätzlich einen Chat-Hinweis.
+- **Ein Anstecken:** id `"health"`, eine `.register(new HealthFeature(permission, interval, threshold))`-Zeile
+  (nach Permission, damit `gate()` existiert) + `config.yml`-Sektion `health.*` (im Composition-Root gelesen).
+  Additiver `gate()`-Getter an `PermissionFeature` — **keine generische Klasse geändert**.
+- **Tests grün:** `BackendHealthMonitorTest` (Schwelle/Recovery/Blip-Toleranz). Gesamt-Build grün
+  (247 Tests, 0 Fehler). Enforcement-Listener = Server-Smoke (manuell). Neue Joins bei totem Backend werden
+  ohnehin schon vom fail-closed PreLogin-Permission-Warmup gekickt → der Lockdown schützt die bereits
+  online-Spieler.

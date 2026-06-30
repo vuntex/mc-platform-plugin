@@ -147,7 +147,7 @@ class HttpBackendClientTest {
     void deleteWithBodySendsTheRequestBody() throws Exception {
         // REVOKE_PERMISSION is DELETE with a body — the body must actually reach the server.
         responseBody = json.toJson(new com.mcplatform.protocol.permission.PlayerPermissionsResponse(
-                PLAYER, java.util.List.of(), java.util.List.of(), java.util.List.of(), null));
+                PLAYER, java.util.List.of(), java.util.List.of(), java.util.List.of(), java.util.List.of(), null));
 
         Object result = await(client().call(
                 com.mcplatform.protocol.permission.PermissionEndpoints.REVOKE_PERMISSION,

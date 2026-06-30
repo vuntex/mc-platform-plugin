@@ -58,9 +58,9 @@ class PlayerPermissionsMenuTest {
     @Test
     void showsGrantHeaderAndOneItemPerDirectPermission() {
         PlayerPermissionsResponse effective = new PlayerPermissionsResponse(target, List.of(),
-                List.of(new ActiveGrant("mcplatform.fly", null, actor, null),
-                        new ActiveGrant("mcplatform.god", 1_700_000_000_000L, actor, "r")),
-                List.of(), null);
+                List.of(new ActiveGrant("mcplatform.fly", null, actor, null, null),
+                        new ActiveGrant("mcplatform.god", 1_700_000_000_000L, actor, null, "r")),
+                List.of(), List.of(), null);
         Menu model = load(effective).menu();
 
         assertTrue(model.getItem(MenuLayout.HEADER).isInteractive(), "interactive add-permission header");
@@ -76,7 +76,7 @@ class PlayerPermissionsMenuTest {
     @Test
     void emptyPermissionsShowsMarker() {
         PlayerPermissionsResponse effective = new PlayerPermissionsResponse(target, List.of(), List.of(),
-                List.of(), null);
+                List.of(), List.of(), null);
         Menu model = load(effective).menu();
         assertNotNull(model.getItem(MenuBuilder.EMPTY_MARKER_SLOT), "empty marker present");
     }

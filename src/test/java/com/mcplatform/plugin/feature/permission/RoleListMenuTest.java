@@ -55,7 +55,7 @@ class RoleListMenuTest {
 
     private static RoleResponse role(int weight) {
         return new RoleResponse(weight, "role" + weight, "Role " + weight, null, null, null, null, null,
-                "material:PAPER", weight, false, true, false, List.of("perm.a", "perm.b"));
+                "material:PAPER", weight, false, true, false, List.of("perm.a", "perm.b"), List.of());
     }
 
     private static RoleResponse[] roles(int count) {
