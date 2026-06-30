@@ -18,6 +18,8 @@ import com.mcplatform.plugin.feature.scoreboard.profile.Profiles;
 import com.mcplatform.plugin.feature.scoreboard.provider.EconomyLineProvider;
 import com.mcplatform.plugin.feature.scoreboard.provider.PermissionLineProvider;
 import com.mcplatform.plugin.feature.scoreboard.render.BukkitScoreboardHandleFactory;
+import com.mcplatform.plugin.feature.scoreboard.render.BukkitScoreboardSound;
+import com.mcplatform.plugin.feature.scoreboard.render.CoinLineAnimator;
 import com.mcplatform.plugin.feature.scoreboard.render.ScoreboardHandleFactory;
 import com.mcplatform.plugin.feature.scoreboard.render.ScoreboardRenderer;
 import com.mcplatform.plugin.feature.scoreboard.render.ScoreboardService;
@@ -72,8 +74,12 @@ public final class ScoreboardFeature implements PluginFeature {
                 new ConditionRule(new RegionCondition(TEST_REGION), Profiles.TEST_EVENT_ID));
         ProfileResolver resolver = new ProfileResolver(rules, catalog);
 
+        // Coins line animates a count-up (+ sound) on a gain. ~2 ticks/step keeps it smooth, not noisy.
+        CoinLineAnimator coinAnimator = new CoinLineAnimator(
+                context.scheduler(), new BukkitScoreboardSound(), 2L);
         ScoreboardService service = new ScoreboardService(
-                new ScoreboardRenderer(), resolver, economyPort, menus.liveBus(), context.scheduler());
+                new ScoreboardRenderer(), resolver, economyPort, menus.liveBus(), context.scheduler(),
+                Profiles.COINS, coinAnimator);
         ScoreboardHandleFactory handles = new BukkitScoreboardHandleFactory();
 
         context.registerListener(new ScoreboardJoinListener(service, handles, regions));

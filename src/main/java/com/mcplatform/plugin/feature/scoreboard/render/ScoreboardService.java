@@ -2,6 +2,7 @@ package com.mcplatform.plugin.feature.scoreboard.render;
 
 import com.mcplatform.plugin.feature.economy.EconomyReadPort;
 import com.mcplatform.plugin.feature.scoreboard.condition.ProfileResolver;
+import com.mcplatform.plugin.feature.scoreboard.model.LineId;
 import com.mcplatform.plugin.feature.scoreboard.model.RenderedLine;
 import com.mcplatform.plugin.feature.scoreboard.model.ScoreboardLine;
 import com.mcplatform.plugin.feature.scoreboard.model.ScoreboardProfile;
@@ -42,15 +43,20 @@ public final class ScoreboardService {
     private final EconomyReadPort economyPort;
     private final MenuLiveBus liveBus;
     private final PlatformScheduler scheduler;
+    private final LineId coinLineId;
+    private final CoinLineRenderer coinLine;
     private final Map<UUID, Board> boards = new ConcurrentHashMap<>();
 
     public ScoreboardService(ScoreboardRenderer renderer, ProfileResolver resolver,
-                             EconomyReadPort economyPort, MenuLiveBus liveBus, PlatformScheduler scheduler) {
+                             EconomyReadPort economyPort, MenuLiveBus liveBus, PlatformScheduler scheduler,
+                             LineId coinLineId, CoinLineRenderer coinLine) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.economyPort = Objects.requireNonNull(economyPort, "economyPort");
         this.liveBus = Objects.requireNonNull(liveBus, "liveBus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.coinLineId = Objects.requireNonNull(coinLineId, "coinLineId");
+        this.coinLine = Objects.requireNonNull(coinLine, "coinLine");
     }
 
     /** Build and show the player's scoreboard. Call on the main thread. */
@@ -74,7 +80,13 @@ public final class ScoreboardService {
             return;
         }
         for (ScoreboardLine line : board.profile().lines()) {
-            if (line.provider().dynamic()) {
+            if (!line.provider().dynamic()) {
+                continue;
+            }
+            if (line.id().equals(coinLineId)) {
+                // The coins line is rendered by the animator (count-up + sound on a gain).
+                coinLine.update(player, board.handle(), coinLineId, economyPort.current(player));
+            } else {
                 board.handle().update(line.id(), line.provider().resolve(board.ctx()));
             }
         }
@@ -88,6 +100,7 @@ public final class ScoreboardService {
         }
         board.live().close();
         board.handle().teardown();
+        coinLine.clear(player);
     }
 
     /** Diagnostics/tests: number of active boards. */

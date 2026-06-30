@@ -9,8 +9,8 @@ commands:
     description: Shows your COINS balance (live, read from the backend).
     usage: /balance
   pay:
-    description: Open the transfer menu to send COINS to another player.
-    usage: /pay
+    description: Send COINS to a player. Large amounts require a click-confirm in chat.
+    usage: /pay <Spieler> <Betrag>
   transactions:
     description: Open the paginated, filterable transaction history (your own, or another player's).
     usage: /transactions [player]

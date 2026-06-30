@@ -9,6 +9,10 @@ backend:
   # Base backoff between retries (milliseconds); grows linearly per attempt.
   retry-backoff-ms: 200
 
+economy:
+  # /pay amounts strictly greater than this require a click-confirm in chat; up to it sends instantly.
+  pay-confirm-threshold: 50000
+
 web:
   # Clickable links handed to the player by /web. {token} is substituted with the one-time
   # web-auth token. These URLs must match the web frontend's redeem routes (greenfield contract).

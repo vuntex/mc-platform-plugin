@@ -26,11 +26,13 @@ public final class EconomyFeature implements PluginFeature {
 
     private final FeatureCache<UUID, Long> balances = new FeatureCache<>();
     private final MenuManager menus;
+    private final long payConfirmThreshold;
     private EconomyReadPort readPort;
 
     /** The shared menu manager is injected by the composition root — no generic class is touched. */
-    public EconomyFeature(MenuManager menus) {
+    public EconomyFeature(MenuManager menus, long payConfirmThreshold) {
         this.menus = menus;
+        this.payConfirmThreshold = payConfirmThreshold;
     }
 
     @Override
@@ -63,9 +65,9 @@ public final class EconomyFeature implements PluginFeature {
         context.registerCommand("balance",
                 new BalanceCommand(context.backend(), context.scheduler(), balances, CURRENCY));
 
-        // /pay: player-side transfer flow (recipient picker → amount editor → confirm → TRANSFER).
+        // /pay <Spieler> <Betrag>: chat-only transfer; amounts over the threshold need a click-confirm.
         context.registerCommand("pay",
-                new PayCommand(context.backend(), context.scheduler(), CURRENCY, menus));
+                new PayCommand(context.backend(), context.scheduler(), CURRENCY, payConfirmThreshold));
 
         // /transactions [Spieler]: paginated, filterable audit trail of coin movements (GET_HISTORY).
         context.registerCommand("transactions",
@@ -75,5 +77,9 @@ public final class EconomyFeature implements PluginFeature {
         // fills its cache lazily — cache-first /balance with a REST fallback, plus the live subscription
         // above — so it stays independent of the session gate. Quit → cache eviction.
         context.registerListener(new PlayerQuitListener(balances));
+
+        // TEMPORARY (testing): give every player a fixed balance on join. Remove before production.
+        context.registerListener(new TestJoinCoinsListener(
+                context.backend(), context.scheduler(), balances, CURRENCY, context.logger()));
     }
 }

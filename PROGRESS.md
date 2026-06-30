@@ -629,10 +629,13 @@ die Features injiziert — das ist der Anstech-Punkt, kein Sonderweg.
 ### Spielerseitig (jeder für sich)
 - **Balance-Menü (LIVE, Single-Value):** `/balance` öffnet ein Menü; Wert-Slot aktualisiert sich live
   bei Balance-Änderung. *LIVE, weil Einzelwert, der sich durch fremde Transaktionen ändert.*
-- **Transfer-Flow:** `/pay` → Spieler-Picker → `TransferMenu` (Wert-Editor −/+ mit Shift-Schritt,
-  §4.6, keine Eingabe neu erfunden) → Confirm-Dialog → `TRANSFER`. **422** (insufficient) und **400**
-  (Self-Transfer/ungültig) werden sauber im Menü gezeigt. *STATIC, Wert ändert sich nur durch eigene
-  Klicks.*
+- **Transfer-Flow (überarbeitet — menülos):** `/pay <Spieler> <Betrag>` rein im Chat (kein Menü mehr;
+  `TransferMenu` entfernt, `PlayerPickerMenu` bleibt für Punishments). Beträge **≤ `economy.pay-confirm-threshold`
+  (Default 50.000)** gehen sofort raus; **darüber** wird eine **klickbare Chat-Bestätigung** gesendet
+  ([ ✔ Bestätigen ] → `/pay confirm`, [ ✘ Abbrechen ] → `/pay cancel`), Pending pro Spieler mit 60s-Ablauf.
+  Alle Meldungen als gestylte Adventure-Components (Betrag grau, Währung grün; Fehler 422/404/400 sauber
+  gemappt); Empfänger wird bei Online-Status benachrichtigt. `TRANSFER` via `callIdempotent` (stabile
+  correlationId). Threshold aus `config.yml`, im Composition-Root gelesen → `EconomyFeature`.
 
 ### Team-seitig (hinter dem Backend-Gate, UI-Gate optimistisch)
 - **Punish-Menü:** `/punishmenu [player]` → ggf. Picker → `PunishMenu`: Templates aus `GET /templates`,
@@ -657,8 +660,8 @@ die Features injiziert — das ist der Anstech-Punkt, kein Sonderweg.
 ### Tests grün (`./gradlew build`, 113 Tests, 0 Fehler)
 - Framework: `MenuLayoutTest`, `PaginationTest`, `MenuBuilderTest`, `MenuRoutingTest`,
   `ConfirmDialogTest`, `MenuLiveBusTest` (+ Leak/200), `OpenMenuTrackerTest`, `PlayerPickerMenuTest`.
-- Economy: `BalanceMenuTest` (LIVE-Slot-Update), `EconomyMenuTextTest`, `TransferMenuTest`
-  (Wert-Editor-Grenzen, Confirm, **422-Pfad**, Success-Close).
+- Economy: `BalanceMenuTest` (LIVE-Slot-Update), `EconomyMenuTextTest`. (`/pay` ist jetzt menülos im
+  Chat — `TransferMenu`/-Test entfernt; siehe Transfer-Flow oben.)
 - Punishments: `PunishmentHistoryMenuTest` (Paginierung/Confirm/**403**/Success),
   `PunishMenuTest` (**canApply-Gating**, **403**-Pfad, Success), `PunishmentMenuTextTest` (403/409/404).
 - Hub: `HubMenuTest` (berechtigter vs. unberechtigter Spieler → unterschiedliche Einträge).
@@ -801,6 +804,14 @@ keinen** Backend-/`plugin-protocol`-/Channel-/REST-Anteil).
 - **Flicker-Strategie (P2): Team-Entry-Slots.** `BukkitScoreboardHandle` kapselt Objective + ein Team je
   Position (unsichtbarer Entry als stabiler Slot, Text im `Team#prefix(Component)`); ein Update ändert nur
   den Prefix des betroffenen Slots → flickerfrei, exakt per `LineId` adressiert.
+- **Coins-Zähl-Animation (+ Sound):** Bei einem **Gewinn** zählt die Coins-Zeile von alt→neu hoch
+  (`CoinLineAnimator`, Bukkit-frei hinter `CoinLineRenderer`): pro Schritt ein weicher Tick
+  (`UI_BUTTON_CLICK`), am Ende ein „ding" (`ENTITY_EXPERIENCE_ORB_PICKUP`) — Sound über die `ScoreboardSound`-
+  Seam (`BukkitScoreboardSound`, testbar via Fake). Verlust/erster Wert (Join) = sofort gesetzt, keine
+  Animation. Max. 20 Schritte, ~2 Ticks/Schritt; ein neuer Gewinn löst den laufenden Lauf ab; Leave bricht ab.
+  Der `ScoreboardService` routet die Coins-`LineId` an den Renderer (sonst generisch). Format zentral in
+  `EconomyLineProvider.coinComponent(long)` → Zwischenwerte sehen aus wie der Endwert. (Ersetzt sauber den
+  Slice-1-Vorbehalt „Animation ist Folge-Slice".)
 - **Live-Update über `MenuLiveBus`-Reuse — KEINE eigene Transport-Subscription.** Das Scoreboard beobachtet
   `menus.liveBus()` je Spieler-UUID und re-rendert nur die dynamischen Zeilen (Coins/Rang) aus den
   Read-Ports (last-write-wins, kein Debounce). Economy feuert `notifyChange` bereits nach `apply`;

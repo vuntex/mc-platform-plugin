@@ -75,7 +75,8 @@ public final class McPlatformPlugin extends JavaPlugin {
         // Economy + permission are referenced so the scoreboard slice can consume their read-ports
         // (spec §4 — consume existing caches). Registration order guarantees both enable before the
         // scoreboard, so their read-ports exist when the scoreboard's onEnable runs.
-        EconomyFeature economy = new EconomyFeature(menus);
+        long payConfirmThreshold = getConfig().getLong("economy.pay-confirm-threshold", 50_000L);
+        EconomyFeature economy = new EconomyFeature(menus, payConfirmThreshold);
         PermissionFeature permission = new PermissionFeature(menus);
 
         // Backend health check → maintenance lockdown. Interval/threshold read here in the composition

@@ -16,6 +16,7 @@ import com.mcplatform.plugin.feature.scoreboard.provider.PermissionLineProvider;
 import com.mcplatform.plugin.feature.scoreboard.render.PlayerContext;
 import com.mcplatform.plugin.feature.scoreboard.render.ScoreboardRenderer;
 import com.mcplatform.plugin.feature.scoreboard.render.ScoreboardService;
+import com.mcplatform.plugin.feature.scoreboard.support.DirectCoinLine;
 import com.mcplatform.plugin.feature.scoreboard.support.FakeBackendClient;
 import com.mcplatform.plugin.feature.scoreboard.support.ImmediateScheduler;
 import com.mcplatform.plugin.feature.scoreboard.support.RecordingScoreboardHandle;
@@ -68,7 +69,7 @@ class ScoreboardServiceTest {
 
         liveBus = new MenuLiveBus();
         service = new ScoreboardService(new ScoreboardRenderer(), resolver, economyPort, liveBus,
-                new ImmediateScheduler());
+                new ImmediateScheduler(), Profiles.COINS, new DirectCoinLine());
         handle = new RecordingScoreboardHandle();
     }
 
